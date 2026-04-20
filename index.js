@@ -8,8 +8,8 @@ const client = new Client({
   ] 
 });
 
-const TOKEN = process.env.TOKEN || 'ضع-توken-البوت-هنا';
-const CLIENT_ID = process.env.CLIENT_ID || 'ضع-id-البوت-هنا';
+const TOKEN = process.env.TOKEN || 'MTQ5NDEwNTUyNjYyMjIyODU0MA.GMAMFn.dOedlVmo7hivMwJpYYFv-PBCma0ZOr6bouSdgo';
+const CLIENT_ID = process.env.CLIENT_ID || '1494105526622228540';
 
 
 const commands = [
