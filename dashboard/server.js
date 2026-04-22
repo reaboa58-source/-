@@ -51,6 +51,8 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🌐 Dashboard شغال على: http://localhost:${PORT}`);
+    console.log('📌 لاحظ: البوت ما يشتغل تلقائياً، اضغط "تشغيل" من Dashboard');
 });
 
+// معالجة الأخطاء
 process.on('unhandledRejection', console.error);
