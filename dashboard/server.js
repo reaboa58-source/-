@@ -12,21 +12,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ======== API Routes ========
 
-// حالة البوت
 app.get('/api/status', (req, res) => {
     res.json(botManager.getStatus());
 });
 
-// قائمة الأوامر
 app.get('/api/commands', (req, res) => {
     res.json(botManager.getCommands());
 });
 
-// تشغيل البوت (مع توكن من الجسم)
 app.post('/api/start', async (req, res) => {
     const { token } = req.body;
     
-    // لو جاء توكن من Dashboard، نستخدمه
     if (token) {
         process.env.DISCORD_TOKEN = token;
     }
@@ -35,7 +31,6 @@ app.post('/api/start', async (req, res) => {
     res.json(result);
 });
 
-// إيقاف البوت
 app.post('/api/stop', async (req, res) => {
     const result = await botManager.stop();
     res.json(result);
@@ -51,8 +46,6 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🌐 Dashboard شغال على: http://localhost:${PORT}`);
-    console.log('📌 لاحظ: البوت ما يشتغل تلقائياً، اضغط "تشغيل" من Dashboard');
 });
 
-// معالجة الأخطاء
 process.on('unhandledRejection', console.error);
