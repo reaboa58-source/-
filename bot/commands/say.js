@@ -13,7 +13,6 @@ module.exports = {
             return message.reply('❌ استخدم: `!say [الرسالة]`');
         }
         
-        // يحذف رسالة الأمر ويرسل الرسالة
         await message.delete().catch(() => {});
         await message.channel.send(text);
     }
