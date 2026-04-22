@@ -9,7 +9,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <header>
             <h1>🤖 Discord Bot Dashboard</h1>
             <div class="status-badge" id="statusBadge">
@@ -18,221 +17,120 @@
             </div>
         </header>
 
-        <!-- Control Panel -->
         <section class="panel controls">
             <h2>⚡ لوحة التحكم</h2>
             <div class="buttons">
-                <button id="startBtn" class="btn btn-start" onclick="startBot()">
-                    ▶️ تشغيل البوت
-                </button>
-                <button id="stopBtn" class="btn btn-stop" onclick="stopBot()" disabled>
-                    ⏹️ إيقاف البوت
-                </button>
-                <button class="btn btn-refresh" onclick="refreshStatus()">
-                    🔄 تحديث
-                </button>
+                <button id="startBtn" class="btn btn-start" onclick="startBot()">▶️ تشغيل</button>
+                <button id="stopBtn" class="btn btn-stop" onclick="stopBot()" disabled>⏹️ إيقاف</button>
+                <button class="btn btn-refresh" onclick="refreshStatus()">🔄 تحديث</button>
             </div>
             
-            <!-- Settings Panel -->
             <div class="settings-panel" style="margin-top: 20px; padding: 20px; background: var(--bg-card); border-radius: 12px;">
-                <h3>🔐 إعدادات البوت</h3>
-                
-                <div class="input-group" style="margin: 15px 0;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Discord Bot Token:</label>
-                    <input type="password" id="botToken" placeholder="ضع التوكن هنا..." 
-                           style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
-                                  background: var(--bg-primary); color: var(--text-primary); font-family: monospace;">
-                </div>
-                
-                <div class="input-group" style="margin: 15px 0;">
-                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Client ID:</label>
-                    <input type="text" id="clientId" placeholder="ضع الـ Client ID هنا..." 
-                           style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
-                                  background: var(--bg-primary); color: var(--text-primary);">
-                </div>
-                
-                <button onclick="saveSettings()" class="btn btn-refresh" style="margin-top: 10px;">
-                    💾 حفظ الإعدادات
-                </button>
-                
-                <div id="saveStatus" style="margin-top: 10px; font-size: 0.9rem;"></div>
+                <h3>🔐 توكن البوت</h3>
+                <input type="password" id="botToken" placeholder="ضع التوكن هنا..." 
+                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
+                              background: var(--bg-primary); color: var(--text-primary); font-family: monospace; margin: 10px 0;">
+                <button onclick="saveToken()" class="btn btn-refresh">💾 حفظ</button>
+                <div id="saveStatus" style="margin-top: 10px;"></div>
             </div>
         </section>
 
-        <!-- Stats -->
         <section class="panel stats">
             <h2>📊 الإحصائيات</h2>
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🏓</div>
-                    <div class="stat-value" id="ping">-</div>
-                    <div class="stat-label">Ping</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🏰</div>
-                    <div class="stat-value" id="guilds">-</div>
-                    <div class="stat-label">السيرفرات</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">👥</div>
-                    <div class="stat-value" id="users">-</div>
-                    <div class="stat-label">المستخدمين</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">⌨️</div>
-                    <div class="stat-value" id="commands">-</div>
-                    <div class="stat-label">الأوامر</div>
-                </div>
+                <div class="stat-card"><div class="stat-icon">🏓</div><div class="stat-value" id="ping">-</div><div class="stat-label">Ping</div></div>
+                <div class="stat-card"><div class="stat-icon">🏰</div><div class="stat-value" id="guilds">-</div><div class="stat-label">السيرفرات</div></div>
+                <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="users">-</div><div class="stat-label">المستخدمين</div></div>
+                <div class="stat-card"><div class="stat-icon">⌨️</div><div class="stat-value" id="commands">-</div><div class="stat-label">الأوامر</div></div>
             </div>
         </section>
 
-        <!-- Bot Info -->
-        <section class="panel info">
-            <h2>ℹ️ معلومات البوت</h2>
-            <div class="info-row">
-                <span>الاسم:</span>
-                <span id="botTag" class="value">-</span>
-            </div>
-            <div class="info-row">
-                <span>البريفكس:</span>
-                <span class="value">!</span>
-            </div>
-        </section>
-
-        <!-- Commands -->
         <section class="panel commands">
-            <h2>⌨️ الأوامر المتاحة</h2>
-            <div class="commands-list" id="commandsList">
-                <div class="loading">جاري التحميل...</div>
-            </div>
+            <h2>⌨️ الأوامر</h2>
+            <div class="commands-list" id="commandsList"><div class="loading">جاري التحميل...</div></div>
         </section>
 
-        <!-- Logs -->
         <section class="panel logs">
             <h2>📝 السجل</h2>
-            <div class="log-container" id="logContainer">
-                <div class="log-entry info">Dashboard جاهز. ادخل التوكن في الإعدادات ثم اضغط "تشغيل".</div>
-            </div>
+            <div class="log-container" id="logContainer"><div class="log-entry info">ادخل التوكن واضغط تشغيل</div></div>
         </section>
     </div>
 
     <script>
-        // ======== Variables ========
         let isBotRunning = false;
 
-        // ======== Settings Functions ========
-
-        // تحميل الإعدادات المحفوظة
-        function loadSettings() {
-            const savedToken = localStorage.getItem('discord_bot_token');
-            const savedClientId = localStorage.getItem('discord_client_id');
-            
-            if (savedToken) {
-                document.getElementById('botToken').value = savedToken;
-            }
-            if (savedClientId) {
-                document.getElementById('clientId').value = savedClientId;
-            }
+        function loadToken() {
+            const saved = localStorage.getItem('discord_bot_token');
+            if (saved) document.getElementById('botToken').value = saved;
         }
 
-        // حفظ الإعدادات
-        function saveSettings() {
+        function saveToken() {
             const token = document.getElementById('botToken').value.trim();
-            const clientId = document.getElementById('clientId').value.trim();
-            
-            if (!token || !clientId) {
-                document.getElementById('saveStatus').innerHTML = 
-                    '<span style="color: var(--accent-danger);">❌ الرجاء ملء جميع الحقول</span>';
+            if (!token) {
+                document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-danger);">❌ ادخل التوكن</span>';
                 return;
             }
-            
             localStorage.setItem('discord_bot_token', token);
-            localStorage.setItem('discord_client_id', clientId);
-            
-            document.getElementById('saveStatus').innerHTML = 
-                '<span style="color: var(--accent-success);">✅ تم الحفظ! يمكنك تشغيل البوت الآن</span>';
-            
-            addLog('🔐 تم حفظ الإعدادات', 'success');
+            document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-success);">✅ تم الحفظ</span>';
+            addLog('🔐 تم حفظ التوكن', 'success');
         }
 
-        // ======== Bot Control Functions ========
-        
         async function startBot() {
             const token = localStorage.getItem('discord_bot_token');
-            
             if (!token) {
-                addLog('❌ الرجاء إدخال التوكن أولاً في الإعدادات', 'error');
-                document.getElementById('saveStatus').innerHTML = 
-                    '<span style="color: var(--accent-danger);">❌ الرجاء إدخال التوكن أولاً</span>';
+                addLog('❌ ادخل التوكن أولاً', 'error');
                 return;
             }
-            
-            addLog('⏳ جاري تشغيل البوت...', 'warning');
-            
+            addLog('⏳ جاري التشغيل...', 'warning');
             try {
-                const response = await fetch('/api/start', { 
+                const res = await fetch('/api/start', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ token: token })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
                 });
-                
-                const data = await response.json();
-                
+                const data = await res.json();
                 if (data.success) {
-                    addLog(data.message, 'success');
+                    addLog('✅ ' + data.message, 'success');
                     isBotRunning = true;
                     updateButtons();
                     setTimeout(refreshStatus, 2000);
                 } else {
-                    addLog(data.message, 'error');
-                }
-            } catch (err) {
-                addLog('❌ خطأ في الاتصال بالسيرفر', 'error');
-            }
-        }
-
-        async function stopBot() {
-            addLog('⏳ جاري إيقاف البوت...', 'warning');
-            
-            try {
-                const response = await fetch('/api/stop', { method: 'POST' });
-                const data = await response.json();
-                
-                if (data.success) {
-                    addLog(data.message, 'success');
-                    isBotRunning = false;
-                    updateButtons();
-                    refreshStatus();
-                } else {
-                    addLog(data.message, 'error');
+                    addLog('❌ ' + data.message, 'error');
                 }
             } catch (err) {
                 addLog('❌ خطأ في الاتصال', 'error');
             }
         }
 
+        async function stopBot() {
+            addLog('⏳ جاري الإيقاف...', 'warning');
+            try {
+                const res = await fetch('/api/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    addLog('✅ ' + data.message, 'success');
+                    isBotRunning = false;
+                    updateButtons();
+                    refreshStatus();
+                }
+            } catch (err) {
+                addLog('❌ خطأ', 'error');
+            }
+        }
+
         async function refreshStatus() {
             try {
-                const [statusRes, commandsRes] = await Promise.all([
-                    fetch('/api/status'),
-                    fetch('/api/commands')
-                ]);
-                
+                const [statusRes, cmdRes] = await Promise.all([fetch('/api/status'), fetch('/api/commands')]);
                 const status = await statusRes.json();
-                const commands = await commandsRes.json();
-                
+                const commands = await cmdRes.json();
                 updateUI(status, commands);
             } catch (err) {
-                addLog('❌ فشل تحديث الحالة', 'error');
+                addLog('❌ فشل التحديث', 'error');
             }
         }
 
         function updateUI(status, commands) {
             isBotRunning = status.isRunning;
-            
-            // Status Badge
             const badge = document.getElementById('statusBadge');
             const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
@@ -247,14 +145,11 @@
                 text.textContent = '❌ متوقف';
             }
             
-            // Stats
             document.getElementById('ping').textContent = status.ping ? status.ping + 'ms' : '-';
             document.getElementById('guilds').textContent = status.guilds || '-';
             document.getElementById('users').textContent = status.users || '-';
             document.getElementById('commands').textContent = status.commands || '-';
-            document.getElementById('botTag').textContent = status.tag || 'غير متصل';
             
-            // Commands List
             const list = document.getElementById('commandsList');
             if (commands.length > 0) {
                 list.innerHTML = commands.map(cmd => `
@@ -264,40 +159,31 @@
                             <span class="cmd-category">${cmd.category}</span>
                         </div>
                         <div class="cmd-desc">${cmd.description}</div>
-                        <div class="cmd-usage">الاستخدام: <code>${cmd.usage}</code></div>
+                        <div class="cmd-usage">استخدام: <code>${cmd.usage || '!' + cmd.name}</code></div>
                     </div>
                 `).join('');
-            } else {
-                list.innerHTML = '<div class="loading">لا توجد أوامر محملة</div>';
             }
             
             updateButtons();
         }
 
         function updateButtons() {
-            const startBtn = document.getElementById('startBtn');
-            const stopBtn = document.getElementById('stopBtn');
-            
-            startBtn.disabled = isBotRunning;
-            stopBtn.disabled = !isBotRunning;
+            document.getElementById('startBtn').disabled = isBotRunning;
+            document.getElementById('stopBtn').disabled = !isBotRunning;
         }
 
-        function addLog(message, type = 'info') {
+        function addLog(msg, type = 'info') {
             const container = document.getElementById('logContainer');
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
-            
-            const time = new Date().toLocaleTimeString('ar-SA');
-            entry.textContent = `[${time}] ${message}`;
-            
+            entry.textContent = `[${new Date().toLocaleTimeString('ar-SA')}] ${msg}`;
             container.appendChild(entry);
             container.scrollTop = container.scrollHeight;
         }
 
-        // ======== Init ========
-        loadSettings(); // تحميل الإعدادات عند فتح الصفحة
+        loadToken();
         refreshStatus();
-        setInterval(refreshStatus, 10000); // تحديث كل 10 ثواني
+        setInterval(refreshStatus, 10000);
     </script>
 </body>
 </html>
