@@ -21,7 +21,6 @@ class BotManager {
         this.setupEvents();
     }
     
-    // تحميل الأوامر من المجلد
     loadCommands() {
         const commandsPath = path.join(__dirname, 'commands');
         const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -42,13 +41,11 @@ class BotManager {
     }
     
     setupEvents() {
-        // جاهز
         this.client.once('ready', () => {
             console.log(`🤖 البوت اشتغل! ${this.client.user.tag}`);
             this.isRunning = true;
         });
         
-        // رسائل
         this.client.on('messageCreate', async (message) => {
             if (message.author.bot || !message.guild) return;
             
@@ -69,28 +66,31 @@ class BotManager {
             }
         });
         
-        // معالجة الأخطاء
         this.client.on('error', console.error);
         this.client.on('warn', console.warn);
     }
     
-    // تشغيل البوت
     async start() {
         if (this.isRunning) {
-            console.log('⚠️ البوت شغال بالفعل!');
             return { success: false, message: 'البوت شغال بالفعل' };
         }
         
+        const token = process.env.DISCORD_TOKEN;
+        
+        if (!token) {
+            return { success: false, message: '❌ التوكن فارغ!' };
+        }
+        
         try {
-            await this.client.login(config.token);
+            await this.client.login(token);
+            this.isRunning = true;
             return { success: true, message: '✅ تم تشغيل البوت', tag: this.client.user?.tag };
         } catch (error) {
             console.error('❌ فشل تشغيل البوت:', error.message);
-            return { success: false, message: 'فشل تشغيل البوت: ' + error.message };
+            return { success: false, message: '❌ خطأ: ' + error.message };
         }
     }
     
-    // إيقاف البوت
     async stop() {
         if (!this.isRunning) {
             return { success: false, message: 'البوت موقف بالفعل' };
@@ -102,7 +102,6 @@ class BotManager {
         return { success: true, message: '✅ تم إيقاف البوت' };
     }
     
-    // حالة البوت
     getStatus() {
         return {
             isRunning: this.isRunning,
@@ -114,7 +113,6 @@ class BotManager {
         };
     }
     
-    // قائمة الأوامر
     getCommands() {
         return Array.from(this.commands.values()).map(cmd => ({
             name: cmd.name,
@@ -125,7 +123,6 @@ class BotManager {
     }
 }
 
-// تصدير instance واحد
 const botManager = new BotManager();
 
 module.exports = botManager;
