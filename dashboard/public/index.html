@@ -32,6 +32,31 @@
                     🔄 تحديث
                 </button>
             </div>
+            
+            <!-- Settings Panel -->
+            <div class="settings-panel" style="margin-top: 20px; padding: 20px; background: var(--bg-card); border-radius: 12px;">
+                <h3>🔐 إعدادات البوت</h3>
+                
+                <div class="input-group" style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Discord Bot Token:</label>
+                    <input type="password" id="botToken" placeholder="ضع التوكن هنا..." 
+                           style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
+                                  background: var(--bg-primary); color: var(--text-primary); font-family: monospace;">
+                </div>
+                
+                <div class="input-group" style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Client ID:</label>
+                    <input type="text" id="clientId" placeholder="ضع الـ Client ID هنا..." 
+                           style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
+                                  background: var(--bg-primary); color: var(--text-primary);">
+                </div>
+                
+                <button onclick="saveSettings()" class="btn btn-refresh" style="margin-top: 10px;">
+                    💾 حفظ الإعدادات
+                </button>
+                
+                <div id="saveStatus" style="margin-top: 10px; font-size: 0.9rem;"></div>
+            </div>
         </section>
 
         <!-- Stats -->
@@ -86,7 +111,7 @@
         <section class="panel logs">
             <h2>📝 السجل</h2>
             <div class="log-container" id="logContainer">
-                <div class="log-entry info">Dashboard جاهز. اضغط "تشغيل" لبدء البوت.</div>
+                <div class="log-entry info">Dashboard جاهز. ادخل التوكن في الإعدادات ثم اضغط "تشغيل".</div>
             </div>
         </section>
     </div>
@@ -95,13 +120,64 @@
         // ======== Variables ========
         let isBotRunning = false;
 
-        // ======== Functions ========
+        // ======== Settings Functions ========
+
+        // تحميل الإعدادات المحفوظة
+        function loadSettings() {
+            const savedToken = localStorage.getItem('discord_bot_token');
+            const savedClientId = localStorage.getItem('discord_client_id');
+            
+            if (savedToken) {
+                document.getElementById('botToken').value = savedToken;
+            }
+            if (savedClientId) {
+                document.getElementById('clientId').value = savedClientId;
+            }
+        }
+
+        // حفظ الإعدادات
+        function saveSettings() {
+            const token = document.getElementById('botToken').value.trim();
+            const clientId = document.getElementById('clientId').value.trim();
+            
+            if (!token || !clientId) {
+                document.getElementById('saveStatus').innerHTML = 
+                    '<span style="color: var(--accent-danger);">❌ الرجاء ملء جميع الحقول</span>';
+                return;
+            }
+            
+            localStorage.setItem('discord_bot_token', token);
+            localStorage.setItem('discord_client_id', clientId);
+            
+            document.getElementById('saveStatus').innerHTML = 
+                '<span style="color: var(--accent-success);">✅ تم الحفظ! يمكنك تشغيل البوت الآن</span>';
+            
+            addLog('🔐 تم حفظ الإعدادات', 'success');
+        }
+
+        // ======== Bot Control Functions ========
         
         async function startBot() {
+            const token = localStorage.getItem('discord_bot_token');
+            
+            if (!token) {
+                addLog('❌ الرجاء إدخال التوكن أولاً في الإعدادات', 'error');
+                document.getElementById('saveStatus').innerHTML = 
+                    '<span style="color: var(--accent-danger);">❌ الرجاء إدخال التوكن أولاً</span>';
+                return;
+            }
+            
             addLog('⏳ جاري تشغيل البوت...', 'warning');
             
             try {
-                const response = await fetch('/api/start', { method: 'POST' });
+                const response = await fetch('/api/start', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: token })
+                });
+                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -219,6 +295,7 @@
         }
 
         // ======== Init ========
+        loadSettings(); // تحميل الإعدادات عند فتح الصفحة
         refreshStatus();
         setInterval(refreshStatus, 10000); // تحديث كل 10 ثواني
     </script>
