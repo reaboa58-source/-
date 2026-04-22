@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const botManager = require('../bot/index');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,17 +22,28 @@ app.get('/api/commands', (req, res) => {
 app.post('/api/start', async (req, res) => {
     const { token } = req.body;
     
-    if (token) {
-        process.env.DISCORD_TOKEN = token;
+    if (!token) {
+        return res.json({ success: false, message: '❌ التوكن فارغ!' });
     }
     
-    const result = await botManager.start();
-    res.json(result);
+    // نحط التوكن في process.env
+    process.env.DISCORD_TOKEN = token;
+    
+    try {
+        const result = await botManager.start();
+        res.json(result);
+    } catch (error) {
+        res.json({ success: false, message: '❌ خطأ: ' + error.message });
+    }
 });
 
 app.post('/api/stop', async (req, res) => {
-    const result = await botManager.stop();
-    res.json(result);
+    try {
+        const result = await botManager.stop();
+        res.json(result);
+    } catch (error) {
+        res.json({ success: false, message: '❌ خطأ: ' + error.message });
+    }
 });
 
 // ======== Page Route ========
@@ -45,7 +55,7 @@ app.get('/', (req, res) => {
 // ======== Start Server ========
 
 app.listen(PORT, () => {
-    console.log(`🌐 Dashboard شغال على: http://localhost:${PORT}`);
+    console.log(`🌐 Dashboard شغال على البورت: ${PORT}`);
 });
 
 process.on('unhandledRejection', console.error);
