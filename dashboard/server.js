@@ -22,8 +22,15 @@ app.get('/api/commands', (req, res) => {
     res.json(botManager.getCommands());
 });
 
-// تشغيل البوت
+// تشغيل البوت (مع توكن من الجسم)
 app.post('/api/start', async (req, res) => {
+    const { token } = req.body;
+    
+    // لو جاء توكن من Dashboard، نستخدمه
+    if (token) {
+        process.env.DISCORD_TOKEN = token;
+    }
+    
     const result = await botManager.start();
     res.json(result);
 });
@@ -44,8 +51,6 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🌐 Dashboard شغال على: http://localhost:${PORT}`);
-    console.log('📌 لاحظ: البوت ما يشتغل تلقائياً، اضغط "تشغيل" من Dashboard');
 });
 
-// معالجة الأخطاء
 process.on('unhandledRejection', console.error);
