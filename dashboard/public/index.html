@@ -10,7 +10,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🤖 Discord Bot Dashboard</h1>
+            <h1> Discord Bot Dashboard</h1>
             <div class="status-badge" id="statusBadge">
                 <span class="dot" id="statusDot"></span>
                 <span id="statusText">جاري التحقق...</span>
@@ -18,7 +18,7 @@
         </header>
 
         <section class="panel controls">
-            <h2>⚡ لوحة التحكم</h2>
+            <h2> لوحة التحكم</h2>
             <div class="buttons">
                 <button id="startBtn" class="btn btn-start" onclick="startBot()">▶️ تشغيل</button>
                 <button id="stopBtn" class="btn btn-stop" onclick="stopBot()" disabled>⏹️ إيقاف</button>
@@ -26,17 +26,17 @@
             </div>
             
             <div class="settings-panel" style="margin-top: 20px; padding: 20px; background: var(--bg-card); border-radius: 12px;">
-                <h3>🔐 توكن البوت</h3>
+                <h3> توكن البوت</h3>
                 <input type="password" id="botToken" placeholder="ضع التوكن هنا..." 
                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
                               background: var(--bg-primary); color: var(--text-primary); font-family: monospace; margin: 10px 0;">
-                <button onclick="saveToken()" class="btn btn-refresh">💾 حفظ</button>
+                <button onclick="saveToken()" class="btn btn-refresh">حفظ</button>
                 <div id="saveStatus" style="margin-top: 10px;"></div>
             </div>
         </section>
 
         <section class="panel stats">
-            <h2>📊 الإحصائيات</h2>
+            <h2> الإحصائيات</h2>
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-icon">🏓</div><div class="stat-value" id="ping">-</div><div class="stat-label">Ping</div></div>
                 <div class="stat-card"><div class="stat-icon">🏰</div><div class="stat-value" id="guilds">-</div><div class="stat-label">السيرفرات</div></div>
@@ -46,12 +46,12 @@
         </section>
 
         <section class="panel commands">
-            <h2>⌨️ الأوامر</h2>
+            <h2> الأوامر</h2>
             <div class="commands-list" id="commandsList"><div class="loading">جاري التحميل...</div></div>
         </section>
 
         <section class="panel logs">
-            <h2>📝 السجل</h2>
+            <h2> السجل</h2>
             <div class="log-container" id="logContainer"><div class="log-entry info">ادخل التوكن واضغط تشغيل</div></div>
         </section>
     </div>
@@ -67,21 +67,21 @@
         function saveToken() {
             const token = document.getElementById('botToken').value.trim();
             if (!token) {
-                document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-danger);">❌ ادخل التوكن</span>';
+                document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-danger);"> ادخل التوكن</span>';
                 return;
             }
             localStorage.setItem('discord_bot_token', token);
-            document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-success);">✅ تم الحفظ</span>';
-            addLog('🔐 تم حفظ التوكن', 'success');
+            document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-success);">تم الحفظ</span>';
+            addLog(' تم حفظ التوكن', 'success');
         }
 
         async function startBot() {
             const token = localStorage.getItem('discord_bot_token');
             if (!token) {
-                addLog('❌ ادخل التوكن أولاً', 'error');
+                addLog(' ادخل التوكن أولاً', 'error');
                 return;
             }
-            addLog('⏳ جاري التشغيل...', 'warning');
+            addLog(' جاري التشغيل...', 'warning');
             try {
                 const res = await fetch('/api/start', {
                     method: 'POST',
