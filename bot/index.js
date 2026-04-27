@@ -36,12 +36,12 @@ class BotManager {
             }
         }
         
-        console.log(`📦 إجمالي الأوامر المحملة: ${this.commands.size}`);
+        console.log(` إجمالي الأوامر المحملة: ${this.commands.size}`);
     }
     
     setupEvents() {
         this.client.once('ready', () => {
-            console.log(`🤖 البوت اشتغل! ${this.client.user.tag}`);
+            console.log(` البوت اشتغل! ${this.client.user.tag}`);
             this.isRunning = true;
         });
         
@@ -67,49 +67,39 @@ class BotManager {
     }
     
     setupInteractions() {
-        // التفاعل مع الأزرار
         this.client.on(Events.InteractionCreate, async (interaction) => {
             if (!interaction.isButton()) return;
             
             const { customId, guild, user, channel } = interaction;
             
-            // فتح تكت
             if (customId === 'open_ticket') {
                 await this.openTicket(interaction);
             }
-            // إغلاق تكت
             else if (customId === 'close_ticket') {
                 await this.closeTicket(interaction);
             }
-            // تغيير الاسم
             else if (customId === 'rename_ticket') {
                 await this.renameTicket(interaction);
             }
-            // استلام
             else if (customId === 'claim_ticket') {
                 await this.claimTicket(interaction);
             }
-            // إضافة عضو
             else if (customId === 'add_member') {
                 await this.addMember(interaction);
             }
-            // إزالة عضو
             else if (customId === 'remove_member') {
                 await this.removeMember(interaction);
             }
-            // أرشفة
             else if (customId === 'archive_ticket') {
                 await this.archiveTicket(interaction);
             }
         });
     }
     
-    // فتح تكت جديد
     async openTicket(interaction) {
         const guild = interaction.guild;
         const user = interaction.user;
         
-        // التحقق من عدم وجود تكت مفتوحة
         const existingTicket = guild.channels.cache.find(
             ch => ch.name === `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`
         );
@@ -121,7 +111,6 @@ class BotManager {
             });
         }
         
-        // إنشاء قناة التكت
         const ticketChannel = await guild.channels.create({
             name: `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
             type: ChannelType.GuildText,
@@ -152,7 +141,7 @@ class BotManager {
         // إرسال رسالة التحكم
         const embed = new EmbedBuilder()
             .setColor('#00ff00')
-            .setTitle('🎫 تذكرة جديدة')
+            .setTitle(' تذكرة جديدة')
             .setDescription(`مرحباً ${user}!\nالموظفون سيساعدونك قريباً.`)
             .addFields(
                 { name: 'الحالة', value: '⏳ في الانتظار', inline: true },
@@ -164,11 +153,11 @@ class BotManager {
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('claim_ticket')
-                    .setLabel('👤 استلام')
+                    .setLabel(' استلام')
                     .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId('close_ticket')
-                    .setLabel('🔒 إغلاق')
+                    .setLabel(' إغلاق')
                     .setStyle(ButtonStyle.Danger)
             );
         
@@ -176,15 +165,15 @@ class BotManager {
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('rename_ticket')
-                    .setLabel('✏️ تغيير الاسم')
+                    .setLabel(' تغيير الاسم')
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId('add_member')
-                    .setLabel('➕ إضافة عضو')
+                    .setLabel('إضافة عضو')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId('remove_member')
-                    .setLabel('➖ إزالة عضو')
+                    .setLabel(' إزالة عضو')
                     .setStyle(ButtonStyle.Secondary)
             );
         
@@ -192,7 +181,7 @@ class BotManager {
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('archive_ticket')
-                    .setLabel('📁 أرشفة')
+                    .setLabel(' أرشفة')
                     .setStyle(ButtonStyle.Primary)
             );
         
@@ -222,14 +211,12 @@ class BotManager {
         
         ticket.claimedBy = interaction.user.id;
         
-        // إضافة صلاحيات للمستلم
         await interaction.channel.permissionOverwrites.create(interaction.user, {
             ViewChannel: true,
             SendMessages: true,
             ReadMessageHistory: true
         });
         
-        // تحديث الرسالة
         const messages = await interaction.channel.messages.fetch({ limit: 10 });
         const botMessage = messages.find(m => m.author.id === this.client.user.id && m.embeds.length > 0);
         
@@ -250,28 +237,23 @@ class BotManager {
         });
     }
     
-    // إغلاق التكت
     async closeTicket(interaction) {
         const ticket = this.tickets.get(interaction.channel.id);
         if (!ticket) return;
         
         await interaction.reply('🔒 جاري إغلاق التذكرة...');
         
-        // حذف من الذاكرة
         this.tickets.delete(interaction.channel.id);
         
-        // حذف القناة بعد 5 ثواني
         setTimeout(async () => {
             await interaction.channel.delete().catch(() => {});
         }, 5000);
     }
     
-    // تغيير الاسم
     async renameTicket(interaction) {
         const ticket = this.tickets.get(interaction.channel.id);
         if (!ticket) return;
         
-        // إنشاء مودال
         const modal = new ModalBuilder()
             .setCustomId('rename_modal')
             .setTitle('تغيير اسم التذكرة');
@@ -289,7 +271,6 @@ class BotManager {
         
         await interaction.showModal(modal);
         
-        // انتظار الرد
         const submitted = await interaction.awaitModalSubmit({
             time: 60000,
             filter: i => i.customId === 'rename_modal'
@@ -302,7 +283,6 @@ class BotManager {
         }
     }
     
-    // إضافة عضو
     async addMember(interaction) {
         await interaction.reply({
             content: 'استخدم: `!adduser @عضو` لإضافة عضو للتذكرة',
@@ -310,7 +290,6 @@ class BotManager {
         });
     }
     
-    // إزالة عضو
     async removeMember(interaction) {
         await interaction.reply({
             content: 'استخدم: `!removeuser @عضو` لإزالة عضو من التذكرة',
@@ -318,19 +297,16 @@ class BotManager {
         });
     }
     
-    // أرشفة
     async archiveTicket(interaction) {
         const ticket = this.tickets.get(interaction.channel.id);
         if (!ticket) return;
         
         await interaction.reply('📁 جاري أرشفة التذكرة...');
         
-        // تغيير الصلاحيات (قراءة فقط)
         await interaction.channel.permissionOverwrites.edit(interaction.guild.id, {
             ViewChannel: false
         });
         
-        // إزالة جميع الصلاحيات الخاصة
         const members = await interaction.channel.members;
         for (const [id, member] of members) {
             if (!member.user.bot) {
@@ -338,10 +314,8 @@ class BotManager {
             }
         }
         
-        // تغيير الاسم
         await interaction.channel.setName(`archived-${interaction.channel.name}`);
         
-        // إرسال رسالة تأكيد
         const embed = new EmbedBuilder()
             .setColor('#ff9900')
             .setTitle('📁 تذكرة مؤرشفة')
