@@ -1,7 +1,4 @@
 const { EmbedBuilder } = require('discord.js');
-const { Client: YouTubeClient } = require('youtubei');
-
-const youtube = new YouTubeClient();
 
 module.exports = {
     name: 'search',
@@ -9,35 +6,40 @@ module.exports = {
     category: 'ميوزك',
     usage: '!search [اسم الأغنية]',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, shoukaku) {
         if (!args.length) {
             return message.reply('❌ حط اسم الأغنية!');
         }
         
         try {
+            if (!shoukaku) {
+                return message.reply('❌ Lavalink مو متصل!');
+            }
+            
             const query = args.join(' ');
+            const node = shoukaku.options.nodeResolver(shoukaku.nodes);
+            
+            if (!node) {
+                return message.reply('❌ ما فيه نود متاح!');
+            }
             
             await message.reply('🔍 جاري البحث...');
             
-            const results = await youtube.search(query, { type: 'video' });
+            const result = await node.rest.resolve(`ytsearch:${query}`);
             
-            if (!results || !results.items || !results.items.length) {
+            if (!result || !result.tracks.length) {
                 return message.reply('❌ ما لقيت شي!');
             }
             
-            const videos = results.items.slice(0, 5);
+            const tracks = result.tracks.slice(0, 5);
             
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Search Results')
-                .setDescription(videos.map((video, i) => {
-                    const duration = video.duration ? 
-                        `${video.duration.minutes || 0}:${(video.duration.seconds || 0).toString().padStart(2, '0')}` : 
-                        '00:00';
-                    
-                    return `${i + 1}. **${video.title}**\n` +
-                           `   Channel: ${video.channel?.name || 'Unknown'} | Duration: ${duration}\n` +
-                           `   [Link](https://youtube.com/watch?v=${video.id})`;
+                .setDescription(tracks.map((track, i) => {
+                    return `${i + 1}. **${track.info.title}**\n` +
+                           `   Channel: ${track.info.author} | Duration: ${formatTime(track.info.length)}\n` +
+                           `   [Link](${track.info.uri})`;
                 }).join('\n\n'))
                 .setFooter({ text: 'Use !play [number] or !play [url]' });
                 
@@ -49,3 +51,11 @@ module.exports = {
         }
     }
 };
+
+function formatTime(ms) {
+    if (!ms) return '00:00';
+    const seconds = Math.floor(ms / 1000);
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
