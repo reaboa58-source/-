@@ -26,7 +26,6 @@ app.post('/api/start', async (req, res) => {
         return res.json({ success: false, message: '❌ التوكن فارغ!' });
     }
     
-    // نحط التوكن في process.env
     process.env.DISCORD_TOKEN = token;
     
     try {
@@ -44,6 +43,24 @@ app.post('/api/stop', async (req, res) => {
     } catch (error) {
         res.json({ success: false, message: '❌ خطأ: ' + error.message });
     }
+});
+
+// ======== Music API ========
+
+app.post('/api/music/play', async (req, res) => {
+    res.json({ success: true, message: 'Use !play in Discord' });
+});
+
+app.post('/api/music/stop', async (req, res) => {
+    res.json({ success: true, message: 'Use !stop in Discord' });
+});
+
+app.post('/api/music/skip', async (req, res) => {
+    res.json({ success: true, message: 'Use !skip in Discord' });
+});
+
+app.get('/api/music/queue', async (req, res) => {
+    res.json({ queue: [] });
 });
 
 // ======== Page Route ========
