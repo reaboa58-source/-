@@ -7,10 +7,9 @@ const {
     StreamType
 } = require('@discordjs/voice');
 const play = require('play-dl');
+const { Client: YouTubeClient } = require('youtubei');
 
-// 🔥 Lavalink support (إضافة فقط)
-let useLavalink = false;
-let lavalinkPlayer;
+const youtube = new YouTubeClient();
 
 module.exports = {
     name: 'play',
@@ -18,15 +17,8 @@ module.exports = {
     category: 'ميوزك',
     usage: '!play [رابط أو اسم]',
     
-    async execute(message, args, client, player) {
+    async execute(message, args, client) {
         try {
-
-            // 🔥 لو Lavalink موجود استخدمه
-            if (player) {
-                useLavalink = true;
-                lavalinkPlayer = player;
-            }
-
             const voiceChannel = message.member.voice.channel;
             
             if (!voiceChannel) {
@@ -45,21 +37,22 @@ module.exports = {
             if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
                 await message.reply('🔍 جاري البحث...');
                 
-                const results = await play.search(query, { limit: 1 });
+                const searchResults = await youtube.search(query, { type: 'video' });
                 
-                if (!results || !results.length) {
+                if (!searchResults || !searchResults.items || !searchResults.items.length) {
                     return message.reply('❌ ما لقيت شي!');
                 }
                 
-                const firstVideo = results[0];
-                videoUrl = firstVideo.url;
+                const firstVideo = searchResults.items[0];
+                videoUrl = `https://youtube.com/watch?v=${firstVideo.id}`;
                 videoInfo = {
                     title: firstVideo.title,
                     author: { name: firstVideo.channel?.name || 'Unknown' },
-                    lengthSeconds: firstVideo.durationInSec || 0,
+                    lengthSeconds: firstVideo.duration?.seconds || 0,
                     thumbnails: firstVideo.thumbnails || []
                 };
             } else {
+                // رابط مباشر - نجيب المعلومات بـ play-dl
                 const info = await play.video_info(videoUrl);
                 videoInfo = {
                     title: info.video_details.title,
@@ -68,44 +61,18 @@ module.exports = {
                     thumbnails: info.video_details.thumbnails || []
                 };
             }
-
-            // 🔥 إذا فيه Lavalink شغّل منه
-            if (useLavalink) {
-                const queue = lavalinkPlayer.nodes.create(message.guild, {
-                    metadata: {
-                        channel: message.channel
-                    }
-                });
-
-                await queue.connect(message.member.voice.channel);
-
-                const result = await lavalinkPlayer.search(videoUrl);
-
-                if (!result.hasTracks()) {
-                    return message.reply('❌ ما لقيت شي في Lavalink');
-                }
-
-                queue.addTrack(result.tracks[0]);
-
-                if (!queue.isPlaying()) {
-                    queue.node.play();
-                }
-
-                return message.reply(`🎧 Lavalink Playing: ${videoInfo.title}`);
-            }
-
-            // =========================
-            // 🔥 كودك الأصلي (بدون تغيير)
-            // =========================
-
+            
+            // الاتصال بالروم
             const connection = joinVoiceChannel({
                 channelId: voiceChannel.id,
                 guildId: message.guild.id,
                 adapterCreator: message.guild.voiceAdapterCreator,
             });
             
+            // إنشاء البلير
             const player = createAudioPlayer();
             
+            // تحميل الصوت بـ play-dl
             const stream = await play.stream(videoUrl);
             
             const resource = createAudioResource(stream.stream, {
@@ -115,6 +82,7 @@ module.exports = {
             player.play(resource);
             connection.subscribe(player);
             
+            // حفظ في Queue
             if (!client.musicQueue) client.musicQueue = new Map();
             const queue = client.musicQueue.get(message.guild.id) || [];
             queue.push({
@@ -126,6 +94,7 @@ module.exports = {
             });
             client.musicQueue.set(message.guild.id, queue);
             
+            // إرسال رسالة
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Now Playing')
@@ -140,6 +109,7 @@ module.exports = {
                 
             await message.reply({ embeds: [embed] });
             
+            // لما يخلص
             player.on(AudioPlayerStatus.Idle, () => {
                 queue.shift();
                 if (queue.length > 0) {
