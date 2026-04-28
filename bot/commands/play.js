@@ -6,8 +6,8 @@ const {
     AudioPlayerStatus,
     StreamType
 } = require('@discordjs/voice');
+const play = require('play-dl');
 const { Client: YouTubeClient } = require('youtubei');
-const youtubeExt = require('youtube-ext');
 
 const youtube = new YouTubeClient();
 
@@ -52,14 +52,13 @@ module.exports = {
                     thumbnails: firstVideo.thumbnails || []
                 };
             } else {
-                // استخراج الـ ID من الرابط
-                const videoId = extractVideoId(videoUrl);
-                const info = await youtubeExt.videoInfo(videoId);
+                // رابط مباشر - نجيب المعلومات بـ play-dl
+                const info = await play.video_info(videoUrl);
                 videoInfo = {
-                    title: info.title,
-                    author: { name: info.channel?.name || 'Unknown' },
-                    lengthSeconds: info.duration || 0,
-                    thumbnails: info.thumbnails || []
+                    title: info.video_details.title,
+                    author: { name: info.video_details.channel?.name || 'Unknown' },
+                    lengthSeconds: info.video_details.durationInSec || 0,
+                    thumbnails: info.video_details.thumbnails || []
                 };
             }
             
@@ -73,14 +72,11 @@ module.exports = {
             // إنشاء البلير
             const player = createAudioPlayer();
             
-            // تحميل الصوت بـ youtube-ext
-            const stream = await youtubeExt.download(extractVideoId(videoUrl), {
-                quality: 'highestaudio',
-                type: 'audio'
-            });
+            // تحميل الصوت بـ play-dl
+            const stream = await play.stream(videoUrl);
             
-            const resource = createAudioResource(stream, {
-                inputType: StreamType.Arbitrary
+            const resource = createAudioResource(stream.stream, {
+                inputType: stream.type
             });
             
             player.play(resource);
@@ -138,24 +134,16 @@ module.exports = {
 
 async function playNext(connection, player, song) {
     try {
-        const stream = await youtubeExt.download(extractVideoId(song.url), {
-            quality: 'highestaudio',
-            type: 'audio'
-        });
+        const stream = await play.stream(song.url);
         
-        const resource = createAudioResource(stream, {
-            inputType: StreamType.Arbitrary
+        const resource = createAudioResource(stream.stream, {
+            inputType: stream.type
         });
         
         player.play(resource);
     } catch (error) {
         console.error('Next error:', error);
     }
-}
-
-function extractVideoId(url) {
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
-    return match ? match[1] : url;
 }
 
 function formatTime(seconds) {
