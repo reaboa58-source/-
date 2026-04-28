@@ -8,12 +8,9 @@ const {
 } = require('@discordjs/voice');
 const play = require('play-dl');
 
-// 🔥 مهم: حط الكوكيز هنا (مرة وحدة)
-play.setToken({
-    youtube: {
-        cookie: "CgJTQRIEGgAgEw%3D%3D"
-    }
-});
+// 🔥 Lavalink support (إضافة فقط)
+let useLavalink = false;
+let lavalinkPlayer;
 
 module.exports = {
     name: 'play',
@@ -21,8 +18,15 @@ module.exports = {
     category: 'ميوزك',
     usage: '!play [رابط أو اسم]',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, player) {
         try {
+
+            // 🔥 لو Lavalink موجود استخدمه
+            if (player) {
+                useLavalink = true;
+                lavalinkPlayer = player;
+            }
+
             const voiceChannel = message.member.voice.channel;
             
             if (!voiceChannel) {
@@ -56,7 +60,6 @@ module.exports = {
                     thumbnails: firstVideo.thumbnails || []
                 };
             } else {
-                // رابط مباشر - نجيب المعلومات بـ play-dl
                 const info = await play.video_info(videoUrl);
                 videoInfo = {
                     title: info.video_details.title,
@@ -65,18 +68,44 @@ module.exports = {
                     thumbnails: info.video_details.thumbnails || []
                 };
             }
-            
-            // الاتصال بالروم
+
+            // 🔥 إذا فيه Lavalink شغّل منه
+            if (useLavalink) {
+                const queue = lavalinkPlayer.nodes.create(message.guild, {
+                    metadata: {
+                        channel: message.channel
+                    }
+                });
+
+                await queue.connect(message.member.voice.channel);
+
+                const result = await lavalinkPlayer.search(videoUrl);
+
+                if (!result.hasTracks()) {
+                    return message.reply('❌ ما لقيت شي في Lavalink');
+                }
+
+                queue.addTrack(result.tracks[0]);
+
+                if (!queue.isPlaying()) {
+                    queue.node.play();
+                }
+
+                return message.reply(`🎧 Lavalink Playing: ${videoInfo.title}`);
+            }
+
+            // =========================
+            // 🔥 كودك الأصلي (بدون تغيير)
+            // =========================
+
             const connection = joinVoiceChannel({
                 channelId: voiceChannel.id,
                 guildId: message.guild.id,
                 adapterCreator: message.guild.voiceAdapterCreator,
             });
             
-            // إنشاء البلير
             const player = createAudioPlayer();
             
-            // تحميل الصوت بـ play-dl
             const stream = await play.stream(videoUrl);
             
             const resource = createAudioResource(stream.stream, {
@@ -86,7 +115,6 @@ module.exports = {
             player.play(resource);
             connection.subscribe(player);
             
-            // حفظ في Queue
             if (!client.musicQueue) client.musicQueue = new Map();
             const queue = client.musicQueue.get(message.guild.id) || [];
             queue.push({
@@ -98,7 +126,6 @@ module.exports = {
             });
             client.musicQueue.set(message.guild.id, queue);
             
-            // إرسال رسالة
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Now Playing')
@@ -113,7 +140,6 @@ module.exports = {
                 
             await message.reply({ embeds: [embed] });
             
-            // لما يخلص
             player.on(AudioPlayerStatus.Idle, () => {
                 queue.shift();
                 if (queue.length > 0) {
