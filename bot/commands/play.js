@@ -6,8 +6,8 @@ const {
     AudioPlayerStatus,
     StreamType
 } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
 const { Client: YouTubeClient } = require('youtubei');
+const youtubeExt = require('youtube-ext');
 
 const youtube = new YouTubeClient();
 
@@ -34,7 +34,7 @@ module.exports = {
             let videoInfo;
             
             // لو مو رابط، نبحث
-            if (!ytdl.validateURL(query) && !query.includes('youtu.be')) {
+            if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
                 await message.reply('🔍 جاري البحث...');
                 
                 const searchResults = await youtube.search(query, { type: 'video' });
@@ -52,9 +52,15 @@ module.exports = {
                     thumbnails: firstVideo.thumbnails || []
                 };
             } else {
-                // رابط مباشر
-                const info = await ytdl.getInfo(videoUrl);
-                videoInfo = info.videoDetails;
+                // استخراج الـ ID من الرابط
+                const videoId = extractVideoId(videoUrl);
+                const info = await youtubeExt.videoInfo(videoId);
+                videoInfo = {
+                    title: info.title,
+                    author: { name: info.channel?.name || 'Unknown' },
+                    lengthSeconds: info.duration || 0,
+                    thumbnails: info.thumbnails || []
+                };
             }
             
             // الاتصال بالروم
@@ -67,11 +73,10 @@ module.exports = {
             // إنشاء البلير
             const player = createAudioPlayer();
             
-            // تحميل الصوت
-            const stream = ytdl(videoUrl, { 
-                filter: 'audioonly',
+            // تحميل الصوت بـ youtube-ext
+            const stream = await youtubeExt.download(extractVideoId(videoUrl), {
                 quality: 'highestaudio',
-                highWaterMark: 1 << 25
+                type: 'audio'
             });
             
             const resource = createAudioResource(stream, {
@@ -133,9 +138,9 @@ module.exports = {
 
 async function playNext(connection, player, song) {
     try {
-        const stream = ytdl(song.url, { 
-            filter: 'audioonly',
-            quality: 'highestaudio'
+        const stream = await youtubeExt.download(extractVideoId(song.url), {
+            quality: 'highestaudio',
+            type: 'audio'
         });
         
         const resource = createAudioResource(stream, {
@@ -146,6 +151,11 @@ async function playNext(connection, player, song) {
     } catch (error) {
         console.error('Next error:', error);
     }
+}
+
+function extractVideoId(url) {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    return match ? match[1] : url;
 }
 
 function formatTime(seconds) {
