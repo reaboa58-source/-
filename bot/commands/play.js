@@ -1,15 +1,4 @@
-const { 
-    EmbedBuilder, 
-    joinVoiceChannel, 
-    createAudioPlayer, 
-    createAudioResource,
-    AudioPlayerStatus,
-    StreamType
-} = require('@discordjs/voice');
-const play = require('play-dl');
-const { Client: YouTubeClient } = require('youtubei');
-
-const youtube = new YouTubeClient();
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
     name: 'play',
@@ -17,7 +6,7 @@ module.exports = {
     category: 'ميوزك',
     usage: '!play [رابط أو اسم]',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, shoukaku) {
         try {
             const voiceChannel = message.member.voice.channel;
             
@@ -29,68 +18,49 @@ module.exports = {
                 return message.reply('❌ حط رابط يوتيوب أو اسم الأغنية!');
             }
             
-            const query = args.join(' ');
-            let videoUrl = query;
-            let videoInfo;
-            
-            // لو مو رابط، نبحث
-            if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
-                await message.reply('🔍 جاري البحث...');
-                
-                const searchResults = await youtube.search(query, { type: 'video' });
-                
-                if (!searchResults || !searchResults.items || !searchResults.items.length) {
-                    return message.reply('❌ ما لقيت شي!');
-                }
-                
-                const firstVideo = searchResults.items[0];
-                videoUrl = `https://youtube.com/watch?v=${firstVideo.id}`;
-                videoInfo = {
-                    title: firstVideo.title,
-                    author: { name: firstVideo.channel?.name || 'Unknown' },
-                    lengthSeconds: firstVideo.duration?.seconds || 0,
-                    thumbnails: firstVideo.thumbnails || []
-                };
-            } else {
-                // رابط مباشر - نجيب المعلومات بـ play-dl
-                const info = await play.video_info(videoUrl);
-                videoInfo = {
-                    title: info.video_details.title,
-                    author: { name: info.video_details.channel?.name || 'Unknown' },
-                    lengthSeconds: info.video_details.durationInSec || 0,
-                    thumbnails: info.video_details.thumbnails || []
-                };
+            if (!shoukaku) {
+                return message.reply('❌ Lavalink مو متصل!');
             }
             
+            const query = args.join(' ');
+            
+            // البحث في Lavalink
+            const node = shoukaku.options.nodeResolver(shoukaku.nodes);
+            
+            if (!node) {
+                return message.reply('❌ ما فيه نود متاح!');
+            }
+            
+            await message.reply('🔍 جاري البحث...');
+            
+            // البحث
+            const result = await node.rest.resolve(query);
+            
+            if (!result || !result.tracks.length) {
+                return message.reply('❌ ما لقيت شي!');
+            }
+            
+            const track = result.tracks[0];
+            
             // الاتصال بالروم
-            const connection = joinVoiceChannel({
-                channelId: voiceChannel.id,
+            const player = await shoukaku.joinVoiceChannel({
                 guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator,
+                channelId: voiceChannel.id,
+                shardId: 0
             });
             
-            // إنشاء البلير
-            const player = createAudioPlayer();
-            
-            // تحميل الصوت بـ play-dl
-            const stream = await play.stream(videoUrl);
-            
-            const resource = createAudioResource(stream.stream, {
-                inputType: stream.type
-            });
-            
-            player.play(resource);
-            connection.subscribe(player);
+            // تشغيل
+            await player.playTrack({ track: track.encoded });
             
             // حفظ في Queue
             if (!client.musicQueue) client.musicQueue = new Map();
             const queue = client.musicQueue.get(message.guild.id) || [];
             queue.push({
-                title: videoInfo.title,
-                url: videoUrl,
-                duration: videoInfo.lengthSeconds,
+                title: track.info.title,
+                url: track.info.uri,
+                duration: track.info.length,
                 requester: message.author.tag,
-                thumbnail: videoInfo.thumbnails?.[0]?.url || ''
+                author: track.info.author
             });
             client.musicQueue.set(message.guild.id, queue);
             
@@ -98,11 +68,10 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Now Playing')
-                .setThumbnail(videoInfo.thumbnails?.[0]?.url || '')
                 .addFields(
-                    { name: 'Title', value: videoInfo.title, inline: false },
-                    { name: 'Duration', value: formatTime(videoInfo.lengthSeconds), inline: true },
-                    { name: 'Channel', value: videoInfo.author?.name || 'Unknown', inline: true }
+                    { name: 'Title', value: track.info.title, inline: false },
+                    { name: 'Duration', value: formatTime(track.info.length), inline: true },
+                    { name: 'Channel', value: track.info.author, inline: true }
                 )
                 .setFooter({ text: `Requested by: ${message.author.tag}` })
                 .setTimestamp();
@@ -110,19 +79,14 @@ module.exports = {
             await message.reply({ embeds: [embed] });
             
             // لما يخلص
-            player.on(AudioPlayerStatus.Idle, () => {
+            player.on('end', () => {
                 queue.shift();
                 if (queue.length > 0) {
-                    playNext(connection, player, queue[0]);
+                    player.playTrack({ track: queue[0].encoded });
                 } else {
-                    connection.destroy();
+                    shoukaku.leaveVoiceChannel(message.guild.id);
                     client.musicQueue.delete(message.guild.id);
                 }
-            });
-            
-            player.on('error', error => {
-                console.error('Player error:', error.message);
-                message.channel.send('❌ Error playing!').catch(() => {});
             });
             
         } catch (error) {
@@ -132,22 +96,9 @@ module.exports = {
     }
 };
 
-async function playNext(connection, player, song) {
-    try {
-        const stream = await play.stream(song.url);
-        
-        const resource = createAudioResource(stream.stream, {
-            inputType: stream.type
-        });
-        
-        player.play(resource);
-    } catch (error) {
-        console.error('Next error:', error);
-    }
-}
-
-function formatTime(seconds) {
-    if (!seconds) return '00:00';
+function formatTime(ms) {
+    if (!ms) return '00:00';
+    const seconds = Math.floor(ms / 1000);
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
