@@ -34,7 +34,8 @@ module.exports = {
             await message.reply('🔍 جاري البحث...');
             
             // البحث
-            const result = await node.rest.resolve(query);
+            const searchQuery = query.startsWith('http') ? query : `ytsearch:${query}`;
+            const result = await node.rest.resolve(searchQuery);
             
             if (!result || !result.tracks.length) {
                 return message.reply('❌ ما لقيت شي!');
@@ -60,7 +61,8 @@ module.exports = {
                 url: track.info.uri,
                 duration: track.info.length,
                 requester: message.author.tag,
-                author: track.info.author
+                author: track.info.author,
+                encoded: track.encoded
             });
             client.musicQueue.set(message.guild.id, queue);
             
@@ -80,12 +82,15 @@ module.exports = {
             
             // لما يخلص
             player.on('end', () => {
-                queue.shift();
-                if (queue.length > 0) {
-                    player.playTrack({ track: queue[0].encoded });
-                } else {
-                    shoukaku.leaveVoiceChannel(message.guild.id);
-                    client.musicQueue.delete(message.guild.id);
+                const currentQueue = client.musicQueue.get(message.guild.id);
+                if (currentQueue) {
+                    currentQueue.shift();
+                    if (currentQueue.length > 0) {
+                        player.playTrack({ track: currentQueue[0].encoded });
+                    } else {
+                        shoukaku.leaveVoiceChannel(message.guild.id);
+                        client.musicQueue.delete(message.guild.id);
+                    }
                 }
             });
             
