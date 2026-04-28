@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,39 +9,56 @@ class BotManager {
                 GatewayIntentBits.Guilds,
                 GatewayIntentBits.GuildMessages,
                 GatewayIntentBits.MessageContent,
-                GatewayIntentBits.GuildMembers
+                GatewayIntentBits.GuildMembers,
+                GatewayIntentBits.GuildVoiceStates
             ]
         });
         
         this.commands = new Collection();
         this.isRunning = false;
-        this.tickets = new Map(); // حفظ التكتات
+        this.musicQueue = new Map();
         
         this.loadCommands();
         this.setupEvents();
-        this.setupInteractions();
     }
     
     loadCommands() {
-        const commandsPath = path.join(__dirname, 'commands');
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-        
-        for (const file of commandFiles) {
-            const filePath = path.join(commandsPath, file);
-            const command = require(filePath);
+        try {
+            const commandsPath = path.join(__dirname, 'commands');
             
-            if ('name' in command && 'execute' in command) {
-                this.commands.set(command.name, command);
-                console.log(`✅ تم تحميل الأمر: ${command.name}`);
+            if (!fs.existsSync(commandsPath)) {
+                console.log('⚠️ مجلد commands غير موجود');
+                return;
             }
+            
+            const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+            
+            for (const file of commandFiles) {
+                const filePath = path.join(commandsPath, file);
+                
+                try {
+                    delete require.cache[require.resolve(filePath)];
+                    const command = require(filePath);
+                    
+                    if (command.name && command.execute) {
+                        this.commands.set(command.name, command);
+                        console.log(`✅ تم تحميل: ${command.name}`);
+                    }
+                } catch (err) {
+                    console.error(`❌ خطأ في تحميل ${file}:`, err.message);
+                }
+            }
+            
+            console.log(`📦 إجمالي الأوامر: ${this.commands.size}`);
+            
+        } catch (error) {
+            console.error('❌ خطأ في تحميل الأوامر:', error.message);
         }
-        
-        console.log(` إجمالي الأوامر المحملة: ${this.commands.size}`);
     }
     
     setupEvents() {
         this.client.once('ready', () => {
-            console.log(` البوت اشتغل! ${this.client.user.tag}`);
+            console.log(`🤖 البوت اشتغل! ${this.client.user.tag}`);
             this.isRunning = true;
         });
         
@@ -60,269 +77,18 @@ class BotManager {
             try {
                 await command.execute(message, args, this.client);
             } catch (error) {
-                console.error(error);
-                await message.reply('❌ صار خطأ في تنفيذ الأمر!');
+                console.error(`❌ خطأ في ${commandName}:`, error.message);
+                message.reply('❌ صار خطأ!').catch(() => {});
             }
         });
-    }
-    
-    setupInteractions() {
-        this.client.on(Events.InteractionCreate, async (interaction) => {
-            if (!interaction.isButton()) return;
-            
-            const { customId, guild, user, channel } = interaction;
-            
-            if (customId === 'open_ticket') {
-                await this.openTicket(interaction);
-            }
-            else if (customId === 'close_ticket') {
-                await this.closeTicket(interaction);
-            }
-            else if (customId === 'rename_ticket') {
-                await this.renameTicket(interaction);
-            }
-            else if (customId === 'claim_ticket') {
-                await this.claimTicket(interaction);
-            }
-            else if (customId === 'add_member') {
-                await this.addMember(interaction);
-            }
-            else if (customId === 'remove_member') {
-                await this.removeMember(interaction);
-            }
-            else if (customId === 'archive_ticket') {
-                await this.archiveTicket(interaction);
-            }
-        });
-    }
-    
-    async openTicket(interaction) {
-        const guild = interaction.guild;
-        const user = interaction.user;
         
-        const existingTicket = guild.channels.cache.find(
-            ch => ch.name === `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`
-        );
-        
-        if (existingTicket) {
-            return interaction.reply({ 
-                content: '❌ لديك تذكرة مفتوحة بالفعل!', 
-                ephemeral: true 
-            });
-        }
-        
-        const ticketChannel = await guild.channels.create({
-            name: `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-            type: ChannelType.GuildText,
-            parent: null, // يمكنك تحديد كاتيجوري
-            permissionOverwrites: [
-                {
-                    id: guild.id,
-                    deny: [PermissionFlagsBits.ViewChannel]
-                },
-                {
-                    id: user.id,
-                    allow: [
-                        PermissionFlagsBits.ViewChannel,
-                        PermissionFlagsBits.SendMessages,
-                        PermissionFlagsBits.ReadMessageHistory
-                    ]
-                }
-            ]
+        this.client.on('error', (err) => {
+            console.error('❌ Discord Error:', err.message);
         });
         
-        // حفظ التكت
-        this.tickets.set(ticketChannel.id, {
-            creator: user.id,
-            claimedBy: null,
-            createdAt: Date.now()
+        this.client.on('warn', (warn) => {
+            console.warn('⚠️ Discord Warning:', warn);
         });
-        
-        // إرسال رسالة التحكم
-        const embed = new EmbedBuilder()
-            .setColor('#00ff00')
-            .setTitle(' تذكرة جديدة')
-            .setDescription(`مرحباً ${user}!\nالموظفون سيساعدونك قريباً.`)
-            .addFields(
-                { name: 'الحالة', value: '⏳ في الانتظار', inline: true },
-                { name: 'المستلم', value: 'غير مستلم', inline: true }
-            )
-            .setTimestamp();
-        
-        const row1 = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('claim_ticket')
-                    .setLabel(' استلام')
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId('close_ticket')
-                    .setLabel(' إغلاق')
-                    .setStyle(ButtonStyle.Danger)
-            );
-        
-        const row2 = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('rename_ticket')
-                    .setLabel(' تغيير الاسم')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('add_member')
-                    .setLabel('إضافة عضو')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('remove_member')
-                    .setLabel(' إزالة عضو')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-        
-        const row3 = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('archive_ticket')
-                    .setLabel(' أرشفة')
-                    .setStyle(ButtonStyle.Primary)
-            );
-        
-        await ticketChannel.send({ 
-            content: `${user}`,
-            embeds: [embed], 
-            components: [row1, row2, row3] 
-        });
-        
-        await interaction.reply({ 
-            content: `✅ تم فتح تذكرتك: ${ticketChannel}`, 
-            ephemeral: true 
-        });
-    }
-    
-    // استلام التكت
-    async claimTicket(interaction) {
-        const ticket = this.tickets.get(interaction.channel.id);
-        if (!ticket) return;
-        
-        if (ticket.claimedBy) {
-            return interaction.reply({ 
-                content: '❌ التذكرة مستلمة بالفعل!', 
-                ephemeral: true 
-            });
-        }
-        
-        ticket.claimedBy = interaction.user.id;
-        
-        await interaction.channel.permissionOverwrites.create(interaction.user, {
-            ViewChannel: true,
-            SendMessages: true,
-            ReadMessageHistory: true
-        });
-        
-        const messages = await interaction.channel.messages.fetch({ limit: 10 });
-        const botMessage = messages.find(m => m.author.id === this.client.user.id && m.embeds.length > 0);
-        
-        if (botMessage) {
-            const embed = EmbedBuilder.from(botMessage.embeds[0])
-                .spliceFields(0, 2)
-                .addFields(
-                    { name: 'الحالة', value: '👤 مستلم', inline: true },
-                    { name: 'المستلم', value: `${interaction.user}`, inline: true }
-                );
-            
-            await botMessage.edit({ embeds: [embed] });
-        }
-        
-        await interaction.reply({ 
-            content: `✅ تم استلام التذكرة بواسطة ${interaction.user}`, 
-            ephemeral: false 
-        });
-    }
-    
-    async closeTicket(interaction) {
-        const ticket = this.tickets.get(interaction.channel.id);
-        if (!ticket) return;
-        
-        await interaction.reply('🔒 جاري إغلاق التذكرة...');
-        
-        this.tickets.delete(interaction.channel.id);
-        
-        setTimeout(async () => {
-            await interaction.channel.delete().catch(() => {});
-        }, 5000);
-    }
-    
-    async renameTicket(interaction) {
-        const ticket = this.tickets.get(interaction.channel.id);
-        if (!ticket) return;
-        
-        const modal = new ModalBuilder()
-            .setCustomId('rename_modal')
-            .setTitle('تغيير اسم التذكرة');
-        
-        const nameInput = new TextInputBuilder()
-            .setCustomId('new_name')
-            .setLabel('الاسم الجديد')
-            .setPlaceholder('مثال: مشكلة-فنية')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMaxLength(100);
-        
-        const row = new ActionRowBuilder().addComponents(nameInput);
-        modal.addComponents(row);
-        
-        await interaction.showModal(modal);
-        
-        const submitted = await interaction.awaitModalSubmit({
-            time: 60000,
-            filter: i => i.customId === 'rename_modal'
-        }).catch(() => null);
-        
-        if (submitted) {
-            const newName = submitted.fields.getTextInputValue('new_name');
-            await interaction.channel.setName(`ticket-${newName}`);
-            await submitted.reply({ content: `✅ تم تغيير الاسم إلى: ${newName}`, ephemeral: true });
-        }
-    }
-    
-    async addMember(interaction) {
-        await interaction.reply({
-            content: 'استخدم: `!adduser @عضو` لإضافة عضو للتذكرة',
-            ephemeral: true
-        });
-    }
-    
-    async removeMember(interaction) {
-        await interaction.reply({
-            content: 'استخدم: `!removeuser @عضو` لإزالة عضو من التذكرة',
-            ephemeral: true
-        });
-    }
-    
-    async archiveTicket(interaction) {
-        const ticket = this.tickets.get(interaction.channel.id);
-        if (!ticket) return;
-        
-        await interaction.reply('📁 جاري أرشفة التذكرة...');
-        
-        await interaction.channel.permissionOverwrites.edit(interaction.guild.id, {
-            ViewChannel: false
-        });
-        
-        const members = await interaction.channel.members;
-        for (const [id, member] of members) {
-            if (!member.user.bot) {
-                await interaction.channel.permissionOverwrites.delete(id);
-            }
-        }
-        
-        await interaction.channel.setName(`archived-${interaction.channel.name}`);
-        
-        const embed = new EmbedBuilder()
-            .setColor('#ff9900')
-            .setTitle('📁 تذكرة مؤرشفة')
-            .setDescription('تم أرشفة هذه التذكرة. لا يمكن التعديل عليها.')
-            .setTimestamp();
-        
-        await interaction.channel.send({ embeds: [embed] });
     }
     
     async start() {
@@ -338,32 +104,42 @@ class BotManager {
         
         try {
             await this.client.login(token);
-            this.isRunning = true;
-            return { success: true, message: '✅ تم تشغيل البوت', tag: this.client.user?.tag };
+            return { success: true, message: '✅ تم التشغيل', tag: this.client.user?.tag };
         } catch (error) {
-            console.error('❌ فشل تشغيل البوت:', error.message);
+            console.error('❌ فشل التشغيل:', error.message);
             return { success: false, message: '❌ خطأ: ' + error.message };
         }
     }
     
     async stop() {
         if (!this.isRunning) {
-            return { success: false, message: 'البوت موقف بالفعل' };
+            return { success: false, message: 'البوت موقف' };
         }
         
-        this.client.destroy();
-        this.isRunning = false;
-        console.log('🛑 تم إيقاف البوت');
-        return { success: true, message: '✅ تم إيقاف البوت' };
+        try {
+            for (const [guildId, queue] of this.musicQueue) {
+                const connection = this.client.voice?.connections?.get(guildId);
+                if (connection) connection.destroy();
+            }
+            this.musicQueue.clear();
+            
+            this.client.destroy();
+            this.isRunning = false;
+            
+            return { success: true, message: '✅ تم الإيقاف' };
+        } catch (error) {
+            console.error('❌ خطأ في الإيقاف:', error.message);
+            return { success: false, message: '❌ خطأ: ' + error.message };
+        }
     }
     
     getStatus() {
         return {
             isRunning: this.isRunning,
             tag: this.client.user?.tag || 'غير متصل',
-            ping: this.client.ws.ping || 0,
-            guilds: this.client.guilds.cache.size,
-            users: this.client.users.cache.size,
+            ping: this.client.ws?.ping || 0,
+            guilds: this.client.guilds?.cache?.size || 0,
+            users: this.client.users?.cache?.size || 0,
             commands: this.commands.size
         };
     }
@@ -371,8 +147,8 @@ class BotManager {
     getCommands() {
         return Array.from(this.commands.values()).map(cmd => ({
             name: cmd.name,
-            description: cmd.description,
-            category: cmd.category,
+            description: cmd.description || 'بدون وصف',
+            category: cmd.category || 'عام',
             usage: cmd.usage || `!${cmd.name}`
         }));
     }
