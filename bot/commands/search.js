@@ -1,5 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
-const yt = require('yt-stream');
+const { Client: YouTubeClient } = require('youtubei');
+
+const youtube = new YouTubeClient();
 
 module.exports = {
     name: 'search',
@@ -14,33 +16,36 @@ module.exports = {
         
         try {
             const query = args.join(' ');
-            const results = await yt.search(query, { limit: 5 });
             
-            if (!results || !results.length) {
+            await message.reply('🔍 جاري البحث...');
+            
+            const results = await youtube.search(query, { type: 'video' });
+            
+            if (!results || !results.items || !results.items.length) {
                 return message.reply('❌ ما لقيت شي!');
             }
+            
+            const videos = results.items.slice(0, 5);
             
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Search Results')
-                .setDescription(results.map((video, i) => 
-                    `${i + 1}. [${video.title}](${video.url})\n` +
-                    `   Channel: ${video.author?.name || 'Unknown'} | Duration: ${formatTime(video.duration)}`
-                ).join('\n\n'))
-                .setFooter({ text: 'Use !play [number] to play' });
+                .setDescription(videos.map((video, i) => {
+                    const duration = video.duration ? 
+                        `${video.duration.minutes || 0}:${(video.duration.seconds || 0).toString().padStart(2, '0')}` : 
+                        '00:00';
+                    
+                    return `${i + 1}. **${video.title}**\n` +
+                           `   Channel: ${video.channel?.name || 'Unknown'} | Duration: ${duration}\n` +
+                           `   [Link](https://youtube.com/watch?v=${video.id})`;
+                }).join('\n\n'))
+                .setFooter({ text: 'Use !play [number] or !play [url]' });
                 
             await message.reply({ embeds: [embed] });
             
         } catch (error) {
             console.error('Search error:', error);
-            message.reply('❌ Error searching: ' + error.message);
+            message.reply('❌ Error: ' + error.message);
         }
     }
 };
-
-function formatTime(seconds) {
-    if (!seconds) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
