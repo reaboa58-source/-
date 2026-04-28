@@ -112,3 +112,22 @@ function formatTime(seconds) {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+// في بداية الأمر، نبحث عن روم المستخدم أولاً
+let voiceChannel = message.member.voice.channel;
+
+// لو مو داخل روم، نبحث عن روم فيه صديقه
+if (!voiceChannel) {
+    // نبحث عن روم فيه أعضاء
+    voiceChannel = message.guild.channels.cache.find(
+        ch => ch.type === 2 && ch.members.size > 0
+    );
+}
+
+// لو لسه ما لقينا، نستخدم أول روم
+if (!voiceChannel) {
+    voiceChannel = message.guild.channels.cache.find(ch => ch.type === 2);
+}
+
+if (!voiceChannel) {
+    return message.reply('❌ ما فيه روم صوتي في السيرفر!');
+}
