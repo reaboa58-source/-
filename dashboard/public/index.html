@@ -3,62 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Bot Dashboard</title>
+    <title>Discord Music Bot Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <header>
-            <h1> Discord Bot Dashboard</h1>
+            <div class="logo">
+                <i class="fas fa-robot"></i>
+                <h1>Discord Music Bot</h1>
+            </div>
             <div class="status-badge" id="statusBadge">
                 <span class="dot" id="statusDot"></span>
                 <span id="statusText">جاري التحقق...</span>
             </div>
         </header>
 
+        <!-- Control Panel -->
         <section class="panel controls">
-            <h2> لوحة التحكم</h2>
+            <h2><i class="fas fa-cog"></i> لوحة التحكم</h2>
             <div class="buttons">
-                <button id="startBtn" class="btn btn-start" onclick="startBot()">▶️ تشغيل</button>
-                <button id="stopBtn" class="btn btn-stop" onclick="stopBot()" disabled>⏹️ إيقاف</button>
-                <button class="btn btn-refresh" onclick="refreshStatus()">🔄 تحديث</button>
+                <button id="startBtn" class="btn btn-start" onclick="startBot()">
+                    <i class="fas fa-play"></i> تشغيل البوت
+                </button>
+                <button id="stopBtn" class="btn btn-stop" onclick="stopBot()" disabled>
+                    <i class="fas fa-stop"></i> إيقاف البوت
+                </button>
+                <button class="btn btn-refresh" onclick="refreshStatus()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
             </div>
             
-            <div class="settings-panel" style="margin-top: 20px; padding: 20px; background: var(--bg-card); border-radius: 12px;">
-                <h3> توكن البوت</h3>
-                <input type="password" id="botToken" placeholder="ضع التوكن هنا..." 
-                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); 
-                              background: var(--bg-primary); color: var(--text-primary); font-family: monospace; margin: 10px 0;">
-                <button onclick="saveToken()" class="btn btn-refresh">حفظ</button>
-                <div id="saveStatus" style="margin-top: 10px;"></div>
+            <div class="settings-panel">
+                <h3><i class="fas fa-key"></i> توكن البوت</h3>
+                <div class="input-group">
+                    <input type="password" id="botToken" placeholder="ضع التوكن هنا..." class="input-field">
+                    <button onclick="saveToken()" class="btn btn-save">
+                        <i class="fas fa-save"></i> حفظ
+                    </button>
+                </div>
+                <div id="saveStatus"></div>
             </div>
         </section>
 
+        <!-- Chat Button -->
+        <section class="panel chat-section">
+            <button class="btn btn-chat-main" onclick="toggleChat()">
+                <i class="fas fa-comments"></i> فتح الشات
+                <span class="chat-badge" id="chatBadge">0</span>
+            </button>
+        </section>
+
+        <!-- Music Panel -->
+        <section class="panel music-panel">
+            <h2><i class="fas fa-music"></i> ميوزك بوت</h2>
+            
+            <div class="music-controls">
+                <div class="now-playing" id="nowPlaying">
+                    <div class="album-art">
+                        <i class="fas fa-compact-disc fa-spin" id="discIcon" style="display: none;"></i>
+                        <i class="fas fa-music" id="musicIcon"></i>
+                    </div>
+                    <div class="song-info">
+                        <h3 id="songTitle">ما فيه شي شغال</h3>
+                        <p id="songArtist">-</p>
+                        <p id="songDuration">00:00 / 00:00</p>
+                    </div>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress" id="progressBar"></div>
+                </div>
+                
+                <div class="controls-buttons">
+                    <button onclick="musicCommand('stop')" class="btn btn-music" title="إيقاف">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                    <button onclick="musicCommand('pause')" class="btn btn-music" title="إيقاف مؤقت">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                    <button onclick="musicCommand('play')" class="btn btn-music btn-play" title="تشغيل">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button onclick="musicCommand('skip')" class="btn btn-music" title="تخطي">
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                    <button onclick="musicCommand('loop')" class="btn btn-music" title="تكرار">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+                
+                <div class="volume-control">
+                    <i class="fas fa-volume-up"></i>
+                    <input type="range" min="0" max="100" value="50" class="volume-slider" id="volumeSlider" onchange="setVolume(this.value)">
+                    <span id="volumeValue">50%</span>
+                </div>
+            </div>
+            
+            <div class="add-song">
+                <h3><i class="fas fa-plus"></i> إضافة أغنية</h3>
+                <div class="input-group">
+                    <input type="text" id="songUrl" placeholder="رابط يوتيوب أو اسم الأغنية..." class="input-field">
+                    <button onclick="addSong()" class="btn btn-add">
+                        <i class="fas fa-plus"></i> إضافة
+                    </button>
+                </div>
+            </div>
+            
+            <div class="queue-section">
+                <h3><i class="fas fa-list"></i> قائمة الانتظار</h3>
+                <div class="queue-list" id="queueList">
+                    <div class="empty-queue">القائمة فاضية</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats -->
         <section class="panel stats">
-            <h2> الإحصائيات</h2>
+            <h2><i class="fas fa-chart-bar"></i> الإحصائيات</h2>
             <div class="stats-grid">
-                <div class="stat-card"><div class="stat-icon">🏓</div><div class="stat-value" id="ping">-</div><div class="stat-label">Ping</div></div>
-                <div class="stat-card"><div class="stat-icon">🏰</div><div class="stat-value" id="guilds">-</div><div class="stat-label">السيرفرات</div></div>
-                <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="users">-</div><div class="stat-label">المستخدمين</div></div>
-                <div class="stat-card"><div class="stat-icon">⌨️</div><div class="stat-value" id="commands">-</div><div class="stat-label">الأوامر</div></div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+                    <div class="stat-value" id="ping">-</div>
+                    <div class="stat-label">Ping</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-server"></i></div>
+                    <div class="stat-value" id="guilds">-</div>
+                    <div class="stat-label">السيرفرات</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-value" id="users">-</div>
+                    <div class="stat-label">المستخدمين</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-terminal"></i></div>
+                    <div class="stat-value" id="commands">-</div>
+                    <div class="stat-label">الأوامر</div>
+                </div>
             </div>
         </section>
 
+        <!-- Commands -->
         <section class="panel commands">
-            <h2> الأوامر</h2>
-            <div class="commands-list" id="commandsList"><div class="loading">جاري التحميل...</div></div>
+            <h2><i class="fas fa-list"></i> الأوامر المتاحة</h2>
+            <div class="commands-list" id="commandsList">
+                <div class="loading">جاري التحميل...</div>
+            </div>
         </section>
 
+        <!-- Logs -->
         <section class="panel logs">
-            <h2> السجل</h2>
-            <div class="log-container" id="logContainer"><div class="log-entry info">ادخل التوكن واضغط تشغيل</div></div>
+            <h2><i class="fas fa-file-alt"></i> السجل</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry info">ادخل التوكن واضغط تشغيل</div>
+            </div>
         </section>
     </div>
 
+    <!-- Chat Modal -->
+    <div class="chat-modal" id="chatModal">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h3><i class="fas fa-comments"></i> شات البوت</h3>
+                <button class="btn-close" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-message system">مرحباً! اكتب رسالتك هنا...</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="اكتب رسالة..." class="chat-input">
+                <button onclick="sendChatMessage()" class="btn btn-send">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin GUI Modal -->
+    <div class="admin-modal" id="adminModal">
+        <div class="admin-container">
+            <div class="admin-header">
+                <div class="admin-avatar">
+                    <img src="https://minotar.net/avatar/Maxerturw7/100.png" alt="Maxerturw7" id="adminSkin">
+                    <div class="admin-rank">👑 OWNER</div>
+                </div>
+                <div class="admin-info">
+                    <h2>Maxerturw7</h2>
+                    <p>مدير النظام</p>
+                </div>
+                <button class="btn-close" onclick="toggleAdminGUI()"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="admin-body">
+                <div class="admin-section">
+                    <h3><i class="fas fa-bullhorn"></i> إذاعة للكل</h3>
+                    <div class="input-group">
+                        <input type="text" id="broadcastMsg" placeholder="اكتب رسالتك للإذاعة..." class="input-field">
+                        <button onclick="sendBroadcast()" class="btn btn-broadcast">
+                            <i class="fas fa-broadcast-tower"></i> إذاعة
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3><i class="fas fa-eye"></i> سبكتيت</h3>
+                    <div class="input-group">
+                        <input type="text" id="spectateTarget" placeholder="اسم اللاعب..." class="input-field">
+                        <button onclick="spectatePlayer()" class="btn btn-spectate">
+                            <i class="fas fa-eye"></i> سبكتيت
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3><i class="fas fa-ban"></i> حظر لاعب</h3>
+                    <div class="input-group">
+                        <input type="text" id="banTarget" placeholder="اسم اللاعب..." class="input-field">
+                        <input type="text" id="banReason" placeholder="السبب..." class="input-field">
+                        <button onclick="banPlayer()" class="btn btn-ban">
+                            <i class="fas fa-ban"></i> حظر
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3><i class="fas fa-cogs"></i> تحكم السيرفر</h3>
+                    <div class="admin-buttons">
+                        <button onclick="serverCommand('kickall')" class="btn btn-danger">
+                            <i class="fas fa-user-times"></i> طرد الكل
+                        </button>
+                        <button onclick="serverCommand('stop')" class="btn btn-danger">
+                            <i class="fas fa-power-off"></i> إيقاف
+                        </button>
+                        <button onclick="serverCommand('restart')" class="btn btn-warning">
+                            <i class="fas fa-redo"></i> ريستارت
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Toggle Button -->
+    <button class="admin-toggle" id="adminToggle" onclick="toggleAdminGUI()">
+        <img src="https://minotar.net/avatar/Maxerturw7/50.png" alt="Admin">
+    </button>
+
     <script>
         let isBotRunning = false;
+        let chatOpen = false;
+        let adminOpen = false;
+        let isPlaying = false;
 
+        // ======== Token Functions ========
         function loadToken() {
             const saved = localStorage.getItem('discord_bot_token');
             if (saved) document.getElementById('botToken').value = saved;
@@ -67,21 +269,28 @@
         function saveToken() {
             const token = document.getElementById('botToken').value.trim();
             if (!token) {
-                document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-danger);"> ادخل التوكن</span>';
+                showStatus('❌ ادخل التوكن', 'error');
                 return;
             }
             localStorage.setItem('discord_bot_token', token);
-            document.getElementById('saveStatus').innerHTML = '<span style="color: var(--accent-success);">تم الحفظ</span>';
-            addLog(' تم حفظ التوكن', 'success');
+            showStatus('✅ تم الحفظ', 'success');
+            addLog('🔐 تم حفظ التوكن', 'success');
         }
 
+        function showStatus(msg, type) {
+            const el = document.getElementById('saveStatus');
+            el.innerHTML = `<span class="${type}">${msg}</span>`;
+            setTimeout(() => el.innerHTML = '', 3000);
+        }
+
+        // ======== Bot Control ========
         async function startBot() {
             const token = localStorage.getItem('discord_bot_token');
             if (!token) {
-                addLog(' ادخل التوكن أولاً', 'error');
+                addLog('❌ ادخل التوكن أولاً', 'error');
                 return;
             }
-            addLog(' جاري التشغيل...', 'warning');
+            addLog('⏳ جاري التشغيل...', 'warning');
             try {
                 const res = await fetch('/api/start', {
                     method: 'POST',
@@ -118,9 +327,160 @@
             }
         }
 
+        // ======== Chat Functions ========
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            document.getElementById('chatModal').classList.toggle('active', chatOpen);
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="chat-message user"><strong>أنت:</strong> ${msg}</div>`;
+            messages.scrollTop = messages.scrollHeight;
+            input.value = '';
+            
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><strong>🤖 بوت:</strong> تم استلام الرسالة!</div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 1000);
+        }
+
+        // ======== Music Functions ========
+        async function musicCommand(cmd) {
+            try {
+                const res = await fetch(`/api/music/${cmd}`, { method: 'POST' });
+                const data = await res.json();
+                addLog(`🎵 ${data.message}`, data.success ? 'success' : 'error');
+                
+                if (cmd === 'play' || cmd === 'pause') {
+                    isPlaying = !isPlaying;
+                    updateMusicIcon();
+                }
+            } catch (err) {
+                addLog('❌ خطأ في التحكم بالميوزك', 'error');
+            }
+        }
+
+        function updateMusicIcon() {
+            const disc = document.getElementById('discIcon');
+            const music = document.getElementById('musicIcon');
+            if (isPlaying) {
+                disc.style.display = 'block';
+                music.style.display = 'none';
+            } else {
+                disc.style.display = 'none';
+                music.style.display = 'block';
+            }
+        }
+
+        function setVolume(value) {
+            document.getElementById('volumeValue').textContent = value + '%';
+            fetch('/api/music/volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: value })
+            }).catch(() => {});
+        }
+
+        async function addSong() {
+            const url = document.getElementById('songUrl').value.trim();
+            if (!url) return addLog('❌ ادخل رابط أو اسم', 'error');
+            
+            addLog('⏳ جاري البحث...', 'warning');
+            try {
+                const res = await fetch('/api/music/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: url })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    addLog(`✅ تمت الإضافة: ${data.title}`, 'success');
+                    document.getElementById('songUrl').value = '';
+                    document.getElementById('songTitle').textContent = data.title;
+                    document.getElementById('songArtist').textContent = data.artist || 'YouTube';
+                    isPlaying = true;
+                    updateMusicIcon();
+                    updateQueue();
+                } else {
+                    addLog('❌ ' + data.message, 'error');
+                }
+            } catch (err) {
+                addLog('❌ خطأ في الإضافة', 'error');
+            }
+        }
+
+        async function updateQueue() {
+            try {
+                const res = await fetch('/api/music/queue');
+                const data = await res.json();
+                
+                const list = document.getElementById('queueList');
+                if (data.queue && data.queue.length) {
+                    list.innerHTML = data.queue.map((song, i) => `
+                        <div class="queue-item">
+                            <span>${i === 0 ? '▶️' : i + 1}. ${song.title}</span>
+                            <span>${song.duration || ''}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="empty-queue">القائمة فاضية</div>';
+                }
+            } catch (err) {
+                console.error('فشل تحديث القائمة');
+            }
+        }
+
+        // ======== Admin GUI Functions ========
+        function toggleAdminGUI() {
+            adminOpen = !adminOpen;
+            document.getElementById('adminModal').classList.toggle('active', adminOpen);
+        }
+
+        function sendBroadcast() {
+            const msg = document.getElementById('broadcastMsg').value.trim();
+            if (!msg) return addLog('❌ ادخل رسالة', 'error');
+            addLog('📢 إذاعة: ' + msg, 'warning');
+            document.getElementById('broadcastMsg').value = '';
+        }
+
+        function spectatePlayer() {
+            const target = document.getElementById('spectateTarget').value.trim();
+            if (!target) return addLog('❌ ادخل اسم اللاعب', 'error');
+            addLog('👁️ سبكتيت على: ' + target, 'success');
+            document.getElementById('spectateTarget').value = '';
+        }
+
+        function banPlayer() {
+            const target = document.getElementById('banTarget').value.trim();
+            const reason = document.getElementById('banReason').value.trim() || 'بدون سبب';
+            if (!target) return addLog('❌ ادخل اسم اللاعب', 'error');
+            addLog('🔨 حظر: ' + target + ' | السبب: ' + reason, 'error');
+            document.getElementById('banTarget').value = '';
+            document.getElementById('banReason').value = '';
+        }
+
+        function serverCommand(cmd) {
+            const cmds = {
+                kickall: 'طرد جميع اللاعبين',
+                stop: 'إيقاف السيرفر',
+                restart: 'ريستارت السيرفر'
+            };
+            addLog('⚠️ ' + cmds[cmd], 'warning');
+        }
+
+        // ======== Status Functions ========
         async function refreshStatus() {
             try {
-                const [statusRes, cmdRes] = await Promise.all([fetch('/api/status'), fetch('/api/commands')]);
+                const [statusRes, cmdRes] = await Promise.all([
+                    fetch('/api/status'),
+                    fetch('/api/commands')
+                ]);
                 const status = await statusRes.json();
                 const commands = await cmdRes.json();
                 updateUI(status, commands);
@@ -181,9 +541,21 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        // ======== Init ========
         loadToken();
         refreshStatus();
+        updateQueue();
         setInterval(refreshStatus, 10000);
+        setInterval(updateQueue, 5000);
+
+        // Enter keys
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+        
+        document.getElementById('songUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addSong();
+        });
     </script>
 </body>
 </html>
