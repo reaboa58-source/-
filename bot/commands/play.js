@@ -6,7 +6,7 @@ const {
     AudioPlayerStatus,
     StreamType
 } = require('@discordjs/voice');
-const play = require('play-dl');
+const yt = require('yt-stream');
 
 module.exports = {
     name: 'play',
@@ -16,7 +16,6 @@ module.exports = {
     
     async execute(message, args, client) {
         try {
-            // التحقق من الروم الصوتي
             const voiceChannel = message.member.voice.channel;
             
             if (!voiceChannel) {
@@ -29,20 +28,24 @@ module.exports = {
             
             const query = args.join(' ');
             
-            // البحث أو التحقق من الرابط
-            let video;
+            // البحث
+            let videoUrl = query;
             
-            if (play.yt_validate(query) === 'video') {
-                video = await play.video_info(query);
-            } else {
-                const search = await play.search(query, { limit: 1 });
-                if (!search.length) {
+            if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
+                // بحث
+                const search = await yt.search(query);
+                if (!search || !search.length) {
                     return message.reply('❌ ما لقيت شي!');
                 }
-                video = await play.video_info(search[0].url);
+                videoUrl = search[0].url;
             }
             
-            const videoDetails = video.video_details;
+            // معلومات الفيديو
+            const info = await yt.getInfo(videoUrl);
+            
+            if (!info) {
+                return message.reply('❌ ما قدرت أجيب معلومات الفيديو!');
+            }
             
             // الاتصال بالروم
             const connection = joinVoiceChannel({
@@ -55,9 +58,14 @@ module.exports = {
             const player = createAudioPlayer();
             
             // تحميل الصوت
-            const stream = await play.stream(videoDetails.url);
+            const stream = await yt.stream(videoUrl, {
+                quality: 'high',
+                type: 'audio',
+                highWaterMark: 1 << 25
+            });
+            
             const resource = createAudioResource(stream.stream, {
-                inputType: stream.type
+                inputType: StreamType.Arbitrary
             });
             
             player.play(resource);
@@ -67,25 +75,25 @@ module.exports = {
             if (!client.musicQueue) client.musicQueue = new Map();
             const queue = client.musicQueue.get(message.guild.id) || [];
             queue.push({
-                title: videoDetails.title,
-                url: videoDetails.url,
-                duration: videoDetails.durationInSec,
+                title: info.title,
+                url: videoUrl,
+                duration: info.duration,
                 requester: message.author.tag,
-                thumbnail: videoDetails.thumbnails[0].url
+                thumbnail: info.thumbnail
             });
             client.musicQueue.set(message.guild.id, queue);
             
             // إرسال رسالة
             const embed = new EmbedBuilder()
-                .setColor('#ff0000')
-                .setTitle('🎵 جاري التشغيل')
-                .setThumbnail(videoDetails.thumbnails[0].url)
+                .setColor('#1a1a1a')
+                .setTitle('Now Playing')
+                .setThumbnail(info.thumbnail || '')
                 .addFields(
-                    { name: '🎤 العنوان', value: videoDetails.title, inline: false },
-                    { name: '⏱️ المدة', value: formatTime(videoDetails.durationInSec), inline: true },
-                    { name: '👤 القناة', value: videoDetails.channel.name, inline: true }
+                    { name: 'Title', value: info.title, inline: false },
+                    { name: 'Duration', value: formatTime(info.duration), inline: true },
+                    { name: 'Channel', value: info.author?.name || 'Unknown', inline: true }
                 )
-                .setFooter({ text: `طلب من: ${message.author.tag}` })
+                .setFooter({ text: `Requested by: ${message.author.tag}` })
                 .setTimestamp();
                 
             await message.reply({ embeds: [embed] });
@@ -103,22 +111,27 @@ module.exports = {
             
             player.on('error', error => {
                 console.error('Player error:', error.message);
-                message.channel.send('❌ خطأ في التشغيل!');
+                message.channel.send('❌ Error playing!').catch(() => {});
             });
             
         } catch (error) {
             console.error('Play error:', error);
-            message.reply('❌ صار خطأ: ' + error.message);
+            message.reply('❌ Error: ' + error.message);
         }
     }
 };
 
 async function playNext(connection, player, song) {
     try {
-        const stream = await play.stream(song.url);
-        const resource = createAudioResource(stream.stream, {
-            inputType: stream.type
+        const stream = await yt.stream(song.url, {
+            quality: 'high',
+            type: 'audio'
         });
+        
+        const resource = createAudioResource(stream.stream, {
+            inputType: StreamType.Arbitrary
+        });
+        
         player.play(resource);
     } catch (error) {
         console.error('Next error:', error);
@@ -126,6 +139,7 @@ async function playNext(connection, player, song) {
 }
 
 function formatTime(seconds) {
+    if (!seconds) return '00:00';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
