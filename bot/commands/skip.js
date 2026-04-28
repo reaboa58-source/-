@@ -1,26 +1,32 @@
-const { getVoiceConnection } = require('@discordjs/voice');
-
 module.exports = {
-    name: 'stop',
-    description: 'إيقاف الموسيقى',
+    name: 'skip',
+    description: 'تخطي الأغنية',
     category: 'ميوزك',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, shoukaku) {
         try {
-            const connection = getVoiceConnection(message.guild.id);
+            const queue = client.musicQueue?.get(message.guild.id);
             
-            if (!connection) {
-                return message.reply('❌ البوت مو في روم!');
+            if (!queue || queue.length < 2) {
+                return message.reply('❌ ما فيه أغنية جاية!');
             }
             
-            connection.destroy();
-            client.musicQueue?.delete(message.guild.id);
+            const player = shoukaku.players.get(message.guild.id);
             
-            await message.reply('⏹️ تم الإيقاف');
+            if (!player) {
+                return message.reply('❌ ما فيه شي شغال!');
+            }
+            
+            queue.shift();
+            const next = queue[0];
+            
+            await player.playTrack({ track: next.encoded });
+            
+            await message.reply(`⏭️ الحين: **${next.title}**`);
             
         } catch (error) {
-            console.error('Stop error:', error);
-            message.reply('❌ خطأ: ' + error.message);
+            console.error('Skip error:', error);
+            message.reply('❌ Error: ' + error.message);
         }
     }
 };
