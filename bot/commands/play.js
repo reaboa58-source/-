@@ -6,7 +6,10 @@ const {
     AudioPlayerStatus,
     StreamType
 } = require('@discordjs/voice');
-const yt = require('yt-stream');
+const ytdl = require('ytdl-core');
+const { Client: YouTubeClient } = require('youtubei');
+
+const youtube = new YouTubeClient();
 
 module.exports = {
     name: 'play',
@@ -27,24 +30,31 @@ module.exports = {
             }
             
             const query = args.join(' ');
-            
-            // البحث
             let videoUrl = query;
+            let videoInfo;
             
-            if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
-                // بحث
-                const search = await yt.search(query);
-                if (!search || !search.length) {
+            // لو مو رابط، نبحث
+            if (!ytdl.validateURL(query) && !query.includes('youtu.be')) {
+                await message.reply('🔍 جاري البحث...');
+                
+                const searchResults = await youtube.search(query, { type: 'video' });
+                
+                if (!searchResults || !searchResults.items || !searchResults.items.length) {
                     return message.reply('❌ ما لقيت شي!');
                 }
-                videoUrl = search[0].url;
-            }
-            
-            // معلومات الفيديو
-            const info = await yt.getInfo(videoUrl);
-            
-            if (!info) {
-                return message.reply('❌ ما قدرت أجيب معلومات الفيديو!');
+                
+                const firstVideo = searchResults.items[0];
+                videoUrl = `https://youtube.com/watch?v=${firstVideo.id}`;
+                videoInfo = {
+                    title: firstVideo.title,
+                    author: { name: firstVideo.channel?.name || 'Unknown' },
+                    lengthSeconds: firstVideo.duration?.seconds || 0,
+                    thumbnails: firstVideo.thumbnails || []
+                };
+            } else {
+                // رابط مباشر
+                const info = await ytdl.getInfo(videoUrl);
+                videoInfo = info.videoDetails;
             }
             
             // الاتصال بالروم
@@ -58,13 +68,13 @@ module.exports = {
             const player = createAudioPlayer();
             
             // تحميل الصوت
-            const stream = await yt.stream(videoUrl, {
-                quality: 'high',
-                type: 'audio',
+            const stream = ytdl(videoUrl, { 
+                filter: 'audioonly',
+                quality: 'highestaudio',
                 highWaterMark: 1 << 25
             });
             
-            const resource = createAudioResource(stream.stream, {
+            const resource = createAudioResource(stream, {
                 inputType: StreamType.Arbitrary
             });
             
@@ -75,11 +85,11 @@ module.exports = {
             if (!client.musicQueue) client.musicQueue = new Map();
             const queue = client.musicQueue.get(message.guild.id) || [];
             queue.push({
-                title: info.title,
+                title: videoInfo.title,
                 url: videoUrl,
-                duration: info.duration,
+                duration: videoInfo.lengthSeconds,
                 requester: message.author.tag,
-                thumbnail: info.thumbnail
+                thumbnail: videoInfo.thumbnails?.[0]?.url || ''
             });
             client.musicQueue.set(message.guild.id, queue);
             
@@ -87,11 +97,11 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('Now Playing')
-                .setThumbnail(info.thumbnail || '')
+                .setThumbnail(videoInfo.thumbnails?.[0]?.url || '')
                 .addFields(
-                    { name: 'Title', value: info.title, inline: false },
-                    { name: 'Duration', value: formatTime(info.duration), inline: true },
-                    { name: 'Channel', value: info.author?.name || 'Unknown', inline: true }
+                    { name: 'Title', value: videoInfo.title, inline: false },
+                    { name: 'Duration', value: formatTime(videoInfo.lengthSeconds), inline: true },
+                    { name: 'Channel', value: videoInfo.author?.name || 'Unknown', inline: true }
                 )
                 .setFooter({ text: `Requested by: ${message.author.tag}` })
                 .setTimestamp();
@@ -123,12 +133,12 @@ module.exports = {
 
 async function playNext(connection, player, song) {
     try {
-        const stream = await yt.stream(song.url, {
-            quality: 'high',
-            type: 'audio'
+        const stream = ytdl(song.url, { 
+            filter: 'audioonly',
+            quality: 'highestaudio'
         });
         
-        const resource = createAudioResource(stream.stream, {
+        const resource = createAudioResource(stream, {
             inputType: StreamType.Arbitrary
         });
         
