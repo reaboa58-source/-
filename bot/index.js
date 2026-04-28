@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Shoukaku, Connectors } = require('shoukaku');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,6 +18,18 @@ class BotManager {
         this.commands = new Collection();
         this.isRunning = false;
         this.musicQueue = new Map();
+        
+        // Lavalink Node - Jirayu
+        this.nodes = [
+            {
+                name: 'Jirayu',
+                url: 'lavalink.jirayu.net:443',
+                auth: 'youshallnotpass',
+                secure: true
+            }
+        ];
+        
+        this.shoukaku = null;
         
         this.loadCommands();
         this.setupEvents();
@@ -57,13 +70,14 @@ class BotManager {
     }
     
     setupEvents() {
-        // Ready
         this.client.once('ready', () => {
             console.log(`🤖 البوت اشتغل! ${this.client.user.tag}`);
             this.isRunning = true;
+            
+            // تشغيل Lavalink
+            this.setupLavalink();
         });
         
-        // Messages
         this.client.on('messageCreate', async (message) => {
             if (message.author.bot || !message.guild) return;
             
@@ -77,14 +91,13 @@ class BotManager {
             if (!command) return;
             
             try {
-                await command.execute(message, args, this.client);
+                await command.execute(message, args, this.client, this.shoukaku);
             } catch (error) {
                 console.error(`❌ خطأ في ${commandName}:`, error.message);
                 message.reply('❌ صار خطأ!').catch(() => {});
             }
         });
         
-        // Errors
         this.client.on('error', (err) => {
             console.error('❌ Discord Error:', err.message);
         });
@@ -92,6 +105,30 @@ class BotManager {
         this.client.on('warn', (warn) => {
             console.warn('⚠️ Discord Warning:', warn);
         });
+    }
+    
+    setupLavalink() {
+        try {
+            this.shoukaku = new Shoukaku(
+                new Connectors.DiscordJS(this.client),
+                this.nodes
+            );
+            
+            this.shoukaku.on('ready', (name) => {
+                console.log(`🎵 Lavalink ${name} جاهز!`);
+            });
+            
+            this.shoukaku.on('error', (name, error) => {
+                console.error(`❌ Lavalink ${name} خطأ:`, error.message);
+            });
+            
+            this.shoukaku.on('close', (name, code) => {
+                console.log(`🔴 Lavalink ${name} انفصل: ${code}`);
+            });
+            
+        } catch (error) {
+            console.error('❌ خطأ في تشغيل Lavalink:', error.message);
+        }
     }
     
     async start() {
@@ -120,12 +157,9 @@ class BotManager {
         }
         
         try {
-            // تنظيف الميوزك
-            for (const [guildId, queue] of this.musicQueue) {
-                const connection = this.client.voice?.connections?.get(guildId);
-                if (connection) connection.destroy();
+            if (this.shoukaku) {
+                await this.shoukaku.disconnect();
             }
-            this.musicQueue.clear();
             
             this.client.destroy();
             this.isRunning = false;
@@ -144,7 +178,8 @@ class BotManager {
             ping: this.client.ws?.ping || 0,
             guilds: this.client.guilds?.cache?.size || 0,
             users: this.client.users?.cache?.size || 0,
-            commands: this.commands.size
+            commands: this.commands.size,
+            lavalink: this.shoukaku ? 'متصل' : 'غير متصل'
         };
     }
     
@@ -159,5 +194,4 @@ class BotManager {
 }
 
 const botManager = new BotManager();
-
 module.exports = botManager;
