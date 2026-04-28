@@ -3,23 +3,29 @@ const { getVoiceConnection } = require('@discordjs/voice');
 
 module.exports = {
     name: 'leave',
-    description: 'يخرج البوت من الروم الصوتي',
+    description: 'يخرج البوت من الروم',
     category: 'ميوزك',
     
     async execute(message, args, client) {
-        const connection = getVoiceConnection(message.guild.id);
-        
-        if (!connection) {
-            return message.reply('❌ البوت مو في أي روم!');
-        }
-        
-        connection.destroy();
-        
-        const embed = new EmbedBuilder()
-            .setColor('#ff0000')
-            .setTitle('👋 خرجت من الروم')
-            .setDescription('تم الخروج بنجاح');
+        try {
+            const connection = getVoiceConnection(message.guild.id);
             
-        await message.reply({ embeds: [embed] });
+            if (!connection) {
+                return message.reply('❌ البوت مو في أي روم!');
+            }
+            
+            connection.destroy();
+            client.musicQueue?.delete(message.guild.id);
+            
+            const embed = new EmbedBuilder()
+                .setColor('#ff0000')
+                .setTitle('👋 خرجت من الروم');
+                
+            await message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Leave error:', error);
+            message.reply('❌ خطأ: ' + error.message);
+        }
     }
 };
