@@ -1,30 +1,26 @@
-const { getVoiceConnection, createAudioPlayer, createAudioResource } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
+const { getVoiceConnection } = require('@discordjs/voice');
 
 module.exports = {
-    name: 'skip',
-    description: 'تخطي الأغنية الحالية',
+    name: 'stop',
+    description: 'إيقاف الموسيقى',
     category: 'ميوزك',
     
     async execute(message, args, client) {
-        const queue = client.musicQueue?.get(message.guild.id);
-        
-        if (!queue || queue.length < 2) {
-            return message.reply('❌ ما فيه أغنية جاية!');
+        try {
+            const connection = getVoiceConnection(message.guild.id);
+            
+            if (!connection) {
+                return message.reply('❌ البوت مو في روم!');
+            }
+            
+            connection.destroy();
+            client.musicQueue?.delete(message.guild.id);
+            
+            await message.reply('⏹️ تم الإيقاف');
+            
+        } catch (error) {
+            console.error('Stop error:', error);
+            message.reply('❌ خطأ: ' + error.message);
         }
-        
-        queue.shift();
-        const next = queue[0];
-        
-        const connection = getVoiceConnection(message.guild.id);
-        const player = createAudioPlayer();
-        
-        const stream = ytdl(next.url, { filter: 'audioonly' });
-        const resource = createAudioResource(stream);
-        
-        player.play(resource);
-        connection.subscribe(player);
-        
-        await message.reply(`⏭️ تم التخطي! الحين: **${next.title}**`);
     }
 };
