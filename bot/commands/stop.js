@@ -1,20 +1,30 @@
-const { getVoiceConnection } = require('@discordjs/voice');
-
 module.exports = {
     name: 'stop',
-    description: 'إيقاف الموسيقى ومغادرة الروم',
+    description: 'إيقاف الموسيقى',
     category: 'ميوزك',
     
-    async execute(message, args, client) {
-        const connection = getVoiceConnection(message.guild.id);
-        
-        if (!connection) {
-            return message.reply('❌ البوت مو في روم صوتي!');
+    async execute(message, args, client, shoukaku) {
+        try {
+            if (!shoukaku) {
+                return message.reply('❌ Lavalink مو متصل!');
+            }
+            
+            const player = shoukaku.players.get(message.guild.id);
+            
+            if (!player) {
+                return message.reply('❌ ما فيه شي شغال!');
+            }
+            
+            await player.stopTrack();
+            await shoukaku.leaveVoiceChannel(message.guild.id);
+            
+            client.musicQueue?.delete(message.guild.id);
+            
+            await message.reply('⏹️ تم الإيقاف');
+            
+        } catch (error) {
+            console.error('Stop error:', error);
+            message.reply('❌ Error: ' + error.message);
         }
-        
-        connection.destroy();
-        client.musicQueue?.delete(message.guild.id);
-        
-        await message.reply('⏹️ تم الإيقاف ومغادرة الروم');
     }
 };
