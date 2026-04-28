@@ -1,6 +1,6 @@
 {
-  "name": "discord-bot-dashboard",
-  "version": "2.0.0",
+  "name": "discord-music-bot",
+  "version": "3.0.0",
   "main": "dashboard/server.js",
   "scripts": {
     "start": "node dashboard/server.js"
@@ -10,10 +10,11 @@
     "discord.js": "^14.14.1",
     "dotenv": "^16.3.1",
     "@discordjs/voice": "^0.16.1",
-    "play-dl": "^1.9.7",
+    "@discordjs/opus": "^0.9.0",
     "ffmpeg-static": "^5.2.0",
     "libsodium-wrappers": "^0.7.13",
-    "@discordjs/opus": "^0.9.0"
+    "youtubei": "^1.2.0",
+    "yt-stream": "^1.4.8"
   },
   "engines": {
     "node": ">=18.0.0"
