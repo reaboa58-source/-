@@ -1,15 +1,9 @@
 const express = require('express');
+const path = require('path'); // ✅ مهم
+const botManager = require('../bot/index'); // ✅ استيراد البوت
+
 const app = express();
-
 const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-    res.send('Bot is running');
-});
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
 
 // Middleware
 app.use(express.json());
@@ -27,13 +21,13 @@ app.get('/api/commands', (req, res) => {
 
 app.post('/api/start', async (req, res) => {
     const { token } = req.body;
-    
+
     if (!token) {
         return res.json({ success: false, message: '❌ التوكن فارغ!' });
     }
-    
+
     process.env.DISCORD_TOKEN = token;
-    
+
     try {
         const result = await botManager.start();
         res.json(result);
@@ -53,19 +47,19 @@ app.post('/api/stop', async (req, res) => {
 
 // ======== Music API ========
 
-app.post('/api/music/play', async (req, res) => {
+app.post('/api/music/play', (req, res) => {
     res.json({ success: true, message: 'Use !play in Discord' });
 });
 
-app.post('/api/music/stop', async (req, res) => {
+app.post('/api/music/stop', (req, res) => {
     res.json({ success: true, message: 'Use !stop in Discord' });
 });
 
-app.post('/api/music/skip', async (req, res) => {
+app.post('/api/music/skip', (req, res) => {
     res.json({ success: true, message: 'Use !skip in Discord' });
 });
 
-app.get('/api/music/queue', async (req, res) => {
+app.get('/api/music/queue', (req, res) => {
     res.json({ queue: [] });
 });
 
