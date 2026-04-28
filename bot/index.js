@@ -2,9 +2,6 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
-// 🔥 Lavalink Player
-const { Player } = require('discord-player');
-
 class BotManager {
     constructor() {
         this.client = new Client({
@@ -16,49 +13,33 @@ class BotManager {
                 GatewayIntentBits.GuildVoiceStates
             ]
         });
-
+        
         this.commands = new Collection();
         this.isRunning = false;
         this.musicQueue = new Map();
-
-        // 🔥 Lavalink Player
-        this.player = new Player(this.client);
-
+        
         this.loadCommands();
         this.setupEvents();
-        this.setupLavalink();
     }
-
-    // 🎧 Lavalink Setup
-    setupLavalink() {
-        this.player.nodes.create({
-            host: process.env.LAVALINK_HOST,
-            port: Number(process.env.LAVALINK_PORT || 80),
-            password: process.env.LAVALINK_PASSWORD,
-            secure: false
-        });
-
-        console.log('🎧 Lavalink connected');
-    }
-
+    
     loadCommands() {
         try {
             const commandsPath = path.join(__dirname, 'commands');
-
+            
             if (!fs.existsSync(commandsPath)) {
                 console.log('⚠️ مجلد commands غير موجود');
                 return;
             }
-
+            
             const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
+            
             for (const file of commandFiles) {
                 const filePath = path.join(commandsPath, file);
-
+                
                 try {
                     delete require.cache[require.resolve(filePath)];
                     const command = require(filePath);
-
+                    
                     if (command.name && command.execute) {
                         this.commands.set(command.name, command);
                         console.log(`✅ تم تحميل: ${command.name}`);
@@ -67,66 +48,63 @@ class BotManager {
                     console.error(`❌ خطأ في تحميل ${file}:`, err.message);
                 }
             }
-
+            
             console.log(`📦 إجمالي الأوامر: ${this.commands.size}`);
-
+            
         } catch (error) {
             console.error('❌ خطأ في تحميل الأوامر:', error.message);
         }
     }
-
+    
     setupEvents() {
+        // Ready
         this.client.once('ready', () => {
             console.log(`🤖 البوت اشتغل! ${this.client.user.tag}`);
             this.isRunning = true;
         });
-
+        
+        // Messages
         this.client.on('messageCreate', async (message) => {
             if (message.author.bot || !message.guild) return;
-
+            
             const prefix = process.env.PREFIX || '!';
             if (!message.content.startsWith(prefix)) return;
-
+            
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
-
+            
             const command = this.commands.get(commandName);
             if (!command) return;
-
+            
             try {
-                await command.execute(
-                    message,
-                    args,
-                    this.client,
-                    this.player, // 🔥 مهم للميوزك
-                    this.musicQueue
-                );
+                await command.execute(message, args, this.client);
             } catch (error) {
                 console.error(`❌ خطأ في ${commandName}:`, error.message);
                 message.reply('❌ صار خطأ!').catch(() => {});
             }
         });
-
+        
+        // Errors
         this.client.on('error', (err) => {
             console.error('❌ Discord Error:', err.message);
         });
-
+        
         this.client.on('warn', (warn) => {
             console.warn('⚠️ Discord Warning:', warn);
         });
     }
-
+    
     async start() {
         if (this.isRunning) {
             return { success: false, message: 'البوت شغال بالفعل' };
         }
-
+        
         const token = process.env.DISCORD_TOKEN;
-
+        
         if (!token) {
             return { success: false, message: '❌ التوكن فارغ!' };
         }
-
+        
         try {
             await this.client.login(token);
             return { success: true, message: '✅ تم التشغيل', tag: this.client.user?.tag };
@@ -135,28 +113,30 @@ class BotManager {
             return { success: false, message: '❌ خطأ: ' + error.message };
         }
     }
-
+    
     async stop() {
         if (!this.isRunning) {
             return { success: false, message: 'البوت موقف' };
         }
-
+        
         try {
+            // تنظيف الميوزك
+            for (const [guildId, queue] of this.musicQueue) {
+                const connection = this.client.voice?.connections?.get(guildId);
+                if (connection) connection.destroy();
+            }
             this.musicQueue.clear();
-
-            // 🔥 Disconnect Lavalink player
-            this.player.destroy();
-
+            
             this.client.destroy();
             this.isRunning = false;
-
+            
             return { success: true, message: '✅ تم الإيقاف' };
         } catch (error) {
             console.error('❌ خطأ في الإيقاف:', error.message);
             return { success: false, message: '❌ خطأ: ' + error.message };
         }
     }
-
+    
     getStatus() {
         return {
             isRunning: this.isRunning,
@@ -167,7 +147,7 @@ class BotManager {
             commands: this.commands.size
         };
     }
-
+    
     getCommands() {
         return Array.from(this.commands.values()).map(cmd => ({
             name: cmd.name,
@@ -179,4 +159,5 @@ class BotManager {
 }
 
 const botManager = new BotManager();
+
 module.exports = botManager;
