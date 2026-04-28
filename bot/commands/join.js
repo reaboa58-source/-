@@ -31,15 +31,15 @@ module.exports = {
             });
             
             const embed = new EmbedBuilder()
-                .setColor('#00ff00')
-                .setTitle('🔊 دخلت الروم')
-                .setDescription(`تم الدخول لـ **${targetChannel.name}**`);
+                .setColor('#1a1a1a')
+                .setTitle('Joined Voice Channel')
+                .setDescription(`Joined **${targetChannel.name}**`);
                 
             await message.reply({ embeds: [embed] });
             
         } catch (error) {
             console.error('Join error:', error);
-            message.reply('❌ فشل الدخول: ' + error.message);
+            message.reply('❌ Error: ' + error.message);
         }
     }
 };
