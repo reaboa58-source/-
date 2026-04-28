@@ -1,5 +1,4 @@
 const { EmbedBuilder } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
 
 module.exports = {
     name: 'join',
@@ -7,8 +6,12 @@ module.exports = {
     category: 'ميوزك',
     usage: '!join أو !join اسم_الروم',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, shoukaku) {
         try {
+            if (!shoukaku) {
+                return message.reply('❌ Lavalink مو متصل!');
+            }
+            
             let targetChannel;
             
             if (args.length > 0) {
@@ -24,10 +27,10 @@ module.exports = {
                 return message.reply('❌ ما لقيت روم صوتي!');
             }
             
-            const connection = joinVoiceChannel({
-                channelId: targetChannel.id,
+            await shoukaku.joinVoiceChannel({
                 guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator,
+                channelId: targetChannel.id,
+                shardId: 0
             });
             
             const embed = new EmbedBuilder()
