@@ -1,31 +1,28 @@
-const { EmbedBuilder } = require('discord.js');
-const { getVoiceConnection } = require('@discordjs/voice');
-
 module.exports = {
     name: 'leave',
     description: 'يخرج البوت من الروم',
     category: 'ميوزك',
     
-    async execute(message, args, client) {
+    async execute(message, args, client, shoukaku) {
         try {
-            const connection = getVoiceConnection(message.guild.id);
-            
-            if (!connection) {
-                return message.reply('❌ البوت مو في أي روم!');
+            if (!shoukaku) {
+                return message.reply('❌ Lavalink مو متصل!');
             }
             
-            connection.destroy();
+            const player = shoukaku.players.get(message.guild.id);
+            
+            if (player) {
+                await player.stopTrack();
+            }
+            
+            await shoukaku.leaveVoiceChannel(message.guild.id);
             client.musicQueue?.delete(message.guild.id);
             
-            const embed = new EmbedBuilder()
-                .setColor('#ff0000')
-                .setTitle('👋 خرجت من الروم');
-                
-            await message.reply({ embeds: [embed] });
+            await message.reply('👋 تم الخروج');
             
         } catch (error) {
             console.error('Leave error:', error);
-            message.reply('❌ خطأ: ' + error.message);
+            message.reply('❌ Error: ' + error.message);
         }
     }
 };
