@@ -7,9 +7,13 @@ const {
     StreamType
 } = require('@discordjs/voice');
 const play = require('play-dl');
-const { Client: YouTubeClient } = require('youtubei');
 
-const youtube = new YouTubeClient();
+// 🔥 مهم: حط الكوكيز هنا (مرة وحدة)
+play.setToken({
+    youtube: {
+        cookie: "CgJTQRIEGgAgEw%3D%3D"
+    }
+});
 
 module.exports = {
     name: 'play',
@@ -37,18 +41,18 @@ module.exports = {
             if (!query.includes('youtube.com') && !query.includes('youtu.be')) {
                 await message.reply('🔍 جاري البحث...');
                 
-                const searchResults = await youtube.search(query, { type: 'video' });
+                const results = await play.search(query, { limit: 1 });
                 
-                if (!searchResults || !searchResults.items || !searchResults.items.length) {
+                if (!results || !results.length) {
                     return message.reply('❌ ما لقيت شي!');
                 }
                 
-                const firstVideo = searchResults.items[0];
-                videoUrl = `https://youtube.com/watch?v=${firstVideo.id}`;
+                const firstVideo = results[0];
+                videoUrl = firstVideo.url;
                 videoInfo = {
                     title: firstVideo.title,
                     author: { name: firstVideo.channel?.name || 'Unknown' },
-                    lengthSeconds: firstVideo.duration?.seconds || 0,
+                    lengthSeconds: firstVideo.durationInSec || 0,
                     thumbnails: firstVideo.thumbnails || []
                 };
             } else {
