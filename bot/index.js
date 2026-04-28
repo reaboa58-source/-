@@ -170,7 +170,23 @@ class BotManager {
             return { success: false, message: '❌ خطأ: ' + error.message };
         }
     }
+    // في setupLavalink، أضف:
+
+this.shoukaku.on('ready', (name) => {
+    console.log(`🎵 Lavalink ${name} جاهز!`);
     
+    // التحقق من النود
+    const node = this.shoukaku.nodes.get(name);
+    if (node) {
+        console.log('Node state:', node.state);
+        console.log('Node stats:', node.stats);
+    }
+});
+
+this.shoukaku.on('error', (name, error) => {
+    console.error(`❌ Lavalink ${name} خطأ:`, error.message);
+    console.error('Error details:', error);
+});
     getStatus() {
         return {
             isRunning: this.isRunning,
