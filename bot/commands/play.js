@@ -87,7 +87,7 @@ module.exports = {
                 connection.subscribe(player);
             }
 
-            // ✅ تشغيل الملف المحلي
+            // تشغيل الملف المحلي
             const resource = createAudioResource(selectedSong.path, {
                 inputType: StreamType.Arbitrary
             });
