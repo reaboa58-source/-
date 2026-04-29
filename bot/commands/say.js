@@ -7,9 +7,6 @@ const {
     StreamType 
 } = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
 
 module.exports = {
     name: 'say',
@@ -51,7 +48,7 @@ module.exports = {
             const player = createAudioPlayer();
             connection.subscribe(player);
 
-            // ✅ تشغيل الصوت من الرابط مباشرة
+            // تشغيل الصوت من الرابط
             const resource = createAudioResource(url, {
                 inputType: StreamType.Arbitrary
             });
@@ -75,3 +72,26 @@ module.exports = {
                 .setTimestamp();
 
             await message.channel.send({ embeds: [embed] });
+
+            // لما يخلص
+            player.once('idle', () => {
+                const currentQueue = client.musicQueue.get(message.guild.id);
+                if (currentQueue) {
+                    currentQueue.shift();
+                    if (currentQueue.length === 0) {
+                        client.musicQueue.delete(message.guild.id);
+                    }
+                }
+            });
+
+            player.on('error', (error) => {
+                console.error('TTS error:', error);
+                message.channel.send('❌ خطأ في التشغيل!').catch(() => {});
+            });
+
+        } catch (error) {
+            console.error('Say error:', error);
+            message.reply('❌ Error: ' + error.message);
+        }
+    }
+};
