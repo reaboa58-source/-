@@ -1,11 +1,10 @@
 const express = require('express');
-const path = require('path'); // ✅ مهم
-const botManager = require('../bot/index'); // ✅ استيراد البوت
+const path = require('path');
+const botManager = require('../bot/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -21,15 +20,12 @@ app.get('/api/commands', (req, res) => {
 
 app.post('/api/start', async (req, res) => {
     const { token } = req.body;
-
     if (!token) {
         return res.json({ success: false, message: '❌ التوكن فارغ!' });
     }
-
     process.env.DISCORD_TOKEN = token;
-
     try {
-        const result = await botManager.start();
+        const result = await botManager.start(token);
         res.json(result);
     } catch (error) {
         res.json({ success: false, message: '❌ خطأ: ' + error.message });
@@ -45,7 +41,7 @@ app.post('/api/stop', async (req, res) => {
     }
 });
 
-// ======== Music API ========
+// ======== Music API (بدون Lavalink) ========
 
 app.post('/api/music/play', (req, res) => {
     res.json({ success: true, message: 'Use !play in Discord' });
