@@ -1,6 +1,14 @@
 const { EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { 
+    joinVoiceChannel, 
+    createAudioPlayer, 
+    createAudioResource, 
+    AudioPlayerStatus,
+    getVoiceConnection,
+    StreamType 
+} = require('@discordjs/voice');
 
 module.exports = {
     name: 'play',
@@ -11,85 +19,79 @@ module.exports = {
     async execute(message, args, client) {
         try {
             const voiceChannel = message.member.voice.channel;
+            if (!voiceChannel) return message.reply('❌ ادخل روم صوتي أولاً!');
 
-            if (!voiceChannel) {
-                return message.reply('❌ ادخل روم صوتي أولاً!');
-            }
-
-            // 📁 مجلد الموسيقى
             const musicFolder = path.join(__dirname, '..', '..', 'music');
-
-            // التأكد من وجود المجلد
             if (!fs.existsSync(musicFolder)) {
                 fs.mkdirSync(musicFolder, { recursive: true });
-                return message.reply('❌ مجلد الموسيقى فاضي! حط ملفات mp3 في مجلد `music/`');
+                return message.reply('❌ مجلد الموسيقى فاضي! حط ملفات في `music/`');
             }
 
-            // جلب جميع ملفات الموسيقى
             const musicFiles = fs.readdirSync(musicFolder)
-                .filter(file => file.endsWith('.mp3') || file.endsWith('.wav') || file.endsWith('.ogg'))
+                .filter(file => /\.(mp3|wav|ogg|webm|m4a)$/i.test(file))
                 .map((file, index) => ({
                     number: index + 1,
-                    name: file.replace(/\.(mp3|wav|ogg)$/i, ''),
+                    name: file.replace(/\.[^/.]+$/, ''),
                     file: file,
                     path: path.join(musicFolder, file)
                 }));
 
             if (musicFiles.length === 0) {
-                return message.reply('❌ ما فيه ملفات موسيقى! حط ملفات صوتية في مجلد `music/`');
+                return message.reply('❌ ما فيه ملفات موسيقى! حط ملفات صوتية في `music/`');
             }
 
-            // إذا ما كتب شي، اعرض قائمة الأغاني
             if (!args.length) {
                 const listEmbed = new EmbedBuilder()
                     .setColor('#1a1a1a')
                     .setTitle('🎵 قائمة الأغاني المتاحة')
-                    .setDescription(
-                        musicFiles.map(s => `\`${s.number}.\` **${s.name}**`).join('\n')
-                    )
+                    .setDescription(musicFiles.map(s => `\`${s.number}.\` **${s.name}**`).join('\n'))
                     .setFooter({ text: `اكتب: !play [رقم أو اسم]` });
-
                 return message.reply({ embeds: [listEmbed] });
             }
 
-            // البحث عن الأغنية
             const query = args.join(' ').toLowerCase();
             let selectedSong;
-
-            // محاولة البحث برقم
             const songNumber = parseInt(query);
+            
             if (!isNaN(songNumber) && songNumber > 0 && songNumber <= musicFiles.length) {
                 selectedSong = musicFiles[songNumber - 1];
             } else {
-                // البحث بالاسم
                 selectedSong = musicFiles.find(s => 
                     s.name.toLowerCase().includes(query) || 
                     s.file.toLowerCase().includes(query)
                 );
             }
 
-            if (!selectedSong) {
-                return message.reply('❌ ما لقيت الأغنية! جرب رقم من القائمة أو اسم صحيح.');
+            if (!selectedSong) return message.reply('❌ ما لقيت الأغنية!');
+
+            // الاتصال بالروم
+            let connection = getVoiceConnection(message.guild.id);
+            if (!connection) {
+                connection = joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: message.guild.id,
+                    adapterCreator: message.guild.voiceAdapterCreator,
+                });
+            } else if (connection.joinConfig.channelId !== voiceChannel.id) {
+                connection.destroy();
+                connection = joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: message.guild.id,
+                    adapterCreator: message.guild.voiceAdapterCreator,
+                });
             }
 
-            // الاتصال بالروم الصوتي
-            const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+            let player = connection.state.subscription?.player;
+            if (!player) {
+                player = createAudioPlayer();
+                connection.subscribe(player);
+            }
 
-            const connection = joinVoiceChannel({
-                channelId: voiceChannel.id,
-                guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator,
+            // ✅ تشغيل الملف المحلي
+            const resource = createAudioResource(selectedSong.path, {
+                inputType: StreamType.Arbitrary
             });
-
-            // إنشاء مشغل
-            const player = createAudioPlayer();
-
-            // إنشاء مصدر صوتي من الملف المحلي
-            const resource = createAudioResource(selectedSong.path);
-
-            // تشغيل
             player.play(resource);
-            connection.subscribe(player);
 
             // حفظ في Queue
             if (!client.musicQueue) client.musicQueue = new Map();
@@ -98,46 +100,38 @@ module.exports = {
                 title: selectedSong.name,
                 file: selectedSong.file,
                 path: selectedSong.path,
-                requester: message.author.tag
+                requester: message.author.tag,
+                type: 'file'
             });
             client.musicQueue.set(message.guild.id, queue);
 
-            // إرسال رسالة التشغيل
             const embed = new EmbedBuilder()
                 .setColor('#1a1a1a')
                 .setTitle('🎵 Now Playing')
                 .addFields(
                     { name: 'Title', value: selectedSong.name, inline: false },
-                    { name: 'File', value: selectedSong.file, inline: true },
+                    { name: 'Type', value: '🎵 Music File', inline: true },
                     { name: 'Requested by', value: message.author.tag, inline: true }
                 )
                 .setTimestamp();
 
             await message.reply({ embeds: [embed] });
 
-            // لما تخلص الأغنية
-            player.on(AudioPlayerStatus.Idle, () => {
+            // لما تخلص
+            player.once(AudioPlayerStatus.Idle, () => {
                 const currentQueue = client.musicQueue.get(message.guild.id);
                 if (currentQueue) {
                     currentQueue.shift();
                     if (currentQueue.length > 0) {
-                        const nextSong = currentQueue[0];
-                        const nextResource = createAudioResource(nextSong.path);
+                        const next = currentQueue[0];
+                        const nextResource = createAudioResource(next.path, {
+                            inputType: StreamType.Arbitrary
+                        });
                         player.play(nextResource);
-
-                        message.channel.send({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setColor('#1a1a1a')
-                                    .setTitle('▶️ Next Track')
-                                    .setDescription(`**${nextSong.title}**`)
-                                    .setFooter({ text: `Requested by: ${nextSong.requester}` })
-                            ]
-                        }).catch(() => {});
+                        message.channel.send(`▶️ **${next.title}**`).catch(() => {});
                     } else {
                         connection.destroy();
                         client.musicQueue.delete(message.guild.id);
-                        message.channel.send('✅ القائمة خلصت!').catch(() => {});
                     }
                 }
             });
