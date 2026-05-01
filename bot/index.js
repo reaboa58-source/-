@@ -52,27 +52,19 @@ console.log(`📋 Total commands loaded: ${client.commands.size}`);
 
 // ========== البيانات ==========
 const GAMES = [
-    { name: 'Mini Games', value: 'minigames', emoji: '🎮' },
-    { name: 'Timebomb Duels', value: 'timebombduels', emoji: '💣' },
-    { name: 'Flee the Facility', value: 'fleethefacility', emoji: '🏃' },
-    { name: 'Murder Mystery 2', value: 'murdermystery2', emoji: '🔪' },
-    { name: 'Adopt Me', value: 'adoptme', emoji: '🐾' },
-    { name: 'Blox Fruits', value: 'bloxfruits', emoji: '🍎' },
-    { name: 'BedWars', value: 'bedwars', emoji: '🛏️' },
-    { name: 'Doors', value: 'doors', emoji: '🚪' },
-    { name: 'Tower of Hell', value: 'towerofhell', emoji: '🏗️' },
-    { name: 'لعبة أخرى', value: 'other', emoji: '❓' }
+    { name: 'Mini Games', value: 'minigames', emoji: '' },
+    { name: 'Timebomb Duels', value: 'timebombduels', emoji: '' },
 ];
 
 const REPORT_TYPES = [
-    { name: 'سندر (Sender/Exploiter)', value: 'sender', emoji: '🤖' },
-    { name: 'أوتو كليك (Auto Clicker)', value: 'autoclick', emoji: '⚡' },
-    { name: 'سبام (Spam)', value: 'spam', emoji: '💬' },
-    { name: 'قذف/شتم', value: 'harassment', emoji: '😡' },
-    { name: 'غش/هاك', value: 'hack', emoji: '💻' },
-    { name: 'تخريب', value: 'griefing', emoji: '🔨' },
-    { name: 'انتحال شخصية', value: 'impersonation', emoji: '🎭' },
-    { name: 'سبب آخر', value: 'other', emoji: '❓' }
+    { name: 'سندر (Sender/Exploiter)', value: 'sender', emoji: '' },
+    { name: 'أوتو كليك (Auto Clicker)', value: 'autoclick', emoji: '' },
+    { name: 'سبام (Spam)', value: 'spam', emoji: '' },
+    { name: 'قذف/شتم', value: 'harassment', emoji: '' },
+    { name: 'غش/هاك', value: 'hack', emoji: '' },
+    { name: 'تخريب', value: 'griefing', emoji: '' },
+    { name: 'انتحال شخصية', value: 'impersonation', emoji: '' },
+    { name: 'سبب آخر', value: 'other', emoji: '' }
 ];
 
 // ========== Events ==========
@@ -187,12 +179,12 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor('#ff0000')
                 .setTitle(`🚨 بلاغ #${reportId}`)
                 .addFields(
-                    { name: '🎮 اللعبة', value: final.game, inline: true },
-                    { name: '⚠️ المخالفة', value: final.type, inline: true },
-                    { name: '📊 الحالة', value: final.status, inline: true },
-                    { name: '👤 المبلغ عنه', value: `\`${final.robloxUser}\``, inline: false },
-                    { name: '🏷️ الاسم الظاهر', value: final.displayName, inline: true },
-                    { name: '📝 التفاصيل', value: final.details, inline: false }
+                    { name: ' اللعبة', value: final.game, inline: true },
+                    { name: ' الفضيحه', value: final.type, inline: true },
+                    { name: ' الحالة', value: final.status, inline: true },
+                    { name: ' المبلغ عنه', value: `\`${final.robloxUser}\``, inline: false },
+                    { name: ' الاسم الظاهر', value: final.displayName, inline: true },
+                    { name: ' التفاصيل', value: final.details, inline: false }
                 )
                 .setFooter({ text: `مقدم: ${final.reporterTag}` })
                 .setTimestamp();
