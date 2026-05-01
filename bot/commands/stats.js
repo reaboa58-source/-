@@ -10,10 +10,10 @@ module.exports = {
             .setColor('#00ff00')
             .setTitle('📊 إحصائيات')
             .addFields(
-                { name: '📋 البلاغات', value: `${reports.length}`, inline: true },
-                { name: '⏳ قيد المراجعة', value: `${reports.filter(r => r.status.includes('⏳')).length}`, inline: true },
-                { name: '✅ مقبولة', value: `${reports.filter(r => r.status.includes('✅')).length}`, inline: true },
-                { name: '🤖 السيرفرات', value: `${client.guilds.cache.size}`, inline: true }
+                { name: ' البلاغات', value: `${reports.length}`, inline: true },
+                { name: ' قيد المراجعة', value: `${reports.filter(r => r.status.includes('')).length}`, inline: true },
+                { name: ' مقبولة', value: `${reports.filter(r => r.status.includes('')).length}`, inline: true },
+                { name: ' السيرفرات', value: `${client.guilds.cache.size}`, inline: true }
             );
         message.reply({ embeds: [embed] });
     }
