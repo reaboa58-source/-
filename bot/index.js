@@ -20,6 +20,7 @@ client.isLoggedIn = false;
 const commandsPath = path.join(__dirname, 'commands');
 
 if (!fs.existsSync(commandsPath)) {
+    console.log('Creating commands folder...');
     fs.mkdirSync(commandsPath, { recursive: true });
 }
 
@@ -52,7 +53,7 @@ const GAMES = [
 
 const REPORT_TYPES = [
     { name: 'سندر', value: 'sender' },
-    { name: 'اوتو كليك', value: 'autoclick' },
+    { name: 'اوتو تراك', value: 'autoclick' },
     { name: 'سبام', value: 'spam' },
     { name: 'قذف', value: 'harassment' },
     { name: 'هاك', value: 'hack' },
@@ -123,7 +124,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setStyle(TextInputStyle.Short)
                 .setPlaceholder('https://...')
                 .setRequired(false)
-                .setMaxLength(200);
+                .setMaxLength(500);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(robloxUserInput),
@@ -211,7 +212,11 @@ client.on('interactionCreate', async (interaction) => {
                 .setTimestamp();
 
             if (final.evidence !== 'لا يوجد') {
-                embed.addFields({ name: 'الدليل', value: final.evidence, inline: false });
+                embed.addFields({ 
+                    name: 'الدليل', 
+                    value: `[اضغط هنا](${final.evidence})`, 
+                    inline: false 
+                });
             }
 
             const buttons = new ActionRowBuilder().addComponents(
@@ -226,8 +231,14 @@ client.on('interactionCreate', async (interaction) => {
             );
 
             if (channel) {
+                let messageContent = `فضيحه جديده من <@${final.reporter}>`;
+                
+                if (final.evidence !== 'لا يوجد') {
+                    messageContent += `\n\n**رابط الفيديو:**\n${final.evidence}`;
+                }
+
                 await channel.send({
-                    content: `فضيحه جديده من <@${final.reporter}>`,
+                    content: messageContent,
                     embeds: [embed],
                     components: [buttons]
                 });
