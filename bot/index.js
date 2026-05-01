@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+const config = require('./config'); // ✅ استخدام config.js
 
 const client = new Client({
     intents: [
@@ -19,7 +19,6 @@ client.reportCounter = 1;
 // ========== تحميل الأوامر ==========
 const commandsPath = path.join(__dirname, 'commands');
 
-// إنشاء المجلد إذا ما كان موجود
 if (!fs.existsSync(commandsPath)) {
     console.log('📁 Creating commands folder...');
     fs.mkdirSync(commandsPath, { recursive: true });
@@ -32,7 +31,7 @@ try {
     for (const file of commandFiles) {
         try {
             const filePath = path.join(commandsPath, file);
-            delete require.cache[require.resolve(filePath)]; // مسح الكاش
+            delete require.cache[require.resolve(filePath)];
             const command = require(filePath);
             
             if (command.name && command.execute) {
@@ -84,9 +83,9 @@ client.once('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith('!')) return;
+    if (message.author.bot || !message.content.startsWith(config.prefix)) return; // ✅ استخدام prefix من config
     
-    const args = message.content.slice(1).trim().split(/ +/);
+    const args = message.content.slice(config.prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
     
     console.log(`📩 Command received: ${commandName}`);
@@ -319,4 +318,5 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// ✅ استخدام التوكن من config.js
+client.login(config.token);
