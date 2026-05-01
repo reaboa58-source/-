@@ -89,21 +89,19 @@ client.on('messageCreate', async (message) => {
     const args = message.content.slice(1).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
     
-    console.log(`📩 Command received: ${commandName}`);
+    console.log(`📩 Command: ${commandName}`);
     
     const command = client.commands.get(commandName);
     if (!command) {
-        console.log(`❌ Command not found: ${commandName}`);
+        console.log(`❌ Not found: ${commandName}`);
         return;
     }
     
     try {
-        console.log(`▶️ Executing: ${commandName}`);
         await command.execute(message, args, client);
-        console.log(`✅ Done: ${commandName}`);
     } catch (error) {
         console.error(`❌ Error in ${commandName}:`, error);
-        message.reply('❌ حصل خطأ أثناء تنفيذ الأمر!').catch(() => {});
+        message.reply('❌ حصل خطأ!').catch(() => {});
     }
 });
 
@@ -116,43 +114,19 @@ client.on('interactionCreate', async (interaction) => {
                 .setCustomId(`report_info_${selectedGame.value}`)
                 .setTitle(`🎮 ${selectedGame.name}`);
 
-            const robloxUserInput = new TextInputBuilder()
-                .setCustomId('roblox_username')
-                .setLabel('Roblox Username')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('RobloxPro123')
-                .setRequired(true)
-                .setMaxLength(50);
-
-            const displayNameInput = new TextInputBuilder()
-                .setCustomId('display_name')
-                .setLabel('Display Name')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('الاسم الظاهر فوق الرأس')
-                .setRequired(false)
-                .setMaxLength(50);
-
-            const detailsInput = new TextInputBuilder()
-                .setCustomId('report_details')
-                .setLabel('تفاصيل المخالفة')
-                .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('اشرح بالتفصيل ايش سوى...')
-                .setRequired(true)
-                .setMaxLength(1000);
-
-            const evidenceInput = new TextInputBuilder()
-                .setCustomId('evidence')
-                .setLabel('رابط صورة/فيديو (اختياري)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://...')
-                .setRequired(false)
-                .setMaxLength(200);
-
             modal.addComponents(
-                new ActionRowBuilder().addComponents(robloxUserInput),
-                new ActionRowBuilder().addComponents(displayNameInput),
-                new ActionRowBuilder().addComponents(detailsInput),
-                new ActionRowBuilder().addComponents(evidenceInput)
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('roblox_username').setLabel('Roblox Username').setStyle(TextInputStyle.Short).setPlaceholder('RobloxPro123').setRequired(true).setMaxLength(50)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('display_name').setLabel('Display Name').setStyle(TextInputStyle.Short).setPlaceholder('الاسم الظاهر').setRequired(false).setMaxLength(50)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('report_details').setLabel('التفاصيل').setStyle(TextInputStyle.Paragraph).setPlaceholder('اشرح المخالفة...').setRequired(true).setMaxLength(1000)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('evidence').setLabel('رابط دليل (اختياري)').setStyle(TextInputStyle.Short).setPlaceholder('https://...').setRequired(false).setMaxLength(200)
+                )
             );
 
             await interaction.showModal(modal);
@@ -179,19 +153,11 @@ client.on('interactionCreate', async (interaction) => {
 
             const typeSelect = new StringSelectMenuBuilder()
                 .setCustomId('select_report_type')
-                .setPlaceholder('⚠️ اختر نوع المخالفة...')
-                .addOptions(REPORT_TYPES.map(t => new StringSelectMenuOptionBuilder()
-                    .setLabel(t.name)
-                    .setValue(t.value)
-                    .setEmoji(t.emoji)
-                ));
+                .setPlaceholder('⚠️ نوع المخالفة...')
+                .addOptions(REPORT_TYPES.map(t => new StringSelectMenuOptionBuilder().setLabel(t.name).setValue(t.value).setEmoji(t.emoji)));
 
             await interaction.reply({
-                embeds: [new EmbedBuilder()
-                    .setColor('#ffaa00')
-                    .setTitle('⚠️ اختر نوع المخالفة')
-                    .setDescription(`**الشخص:** ${robloxUser}\n**اللعبة:** ${game.name}`)
-                ],
+                embeds: [new EmbedBuilder().setColor('#ffaa00').setTitle('⚠️ اختر نوع المخالفة').setDescription(`**الشخص:** ${robloxUser}\n**اللعبة:** ${game.name}`)],
                 components: [new ActionRowBuilder().addComponents(typeSelect)],
                 ephemeral: true
             });
@@ -202,10 +168,7 @@ client.on('interactionCreate', async (interaction) => {
             const temp = client.reports.get(interaction.user.id);
             
             if (!temp) {
-                return interaction.reply({ 
-                    content: '❌ انتهت الجلسة! ابدأ من جديد بـ `!report`', 
-                    ephemeral: true 
-                });
+                return interaction.reply({ content: '❌ انتهت الجلسة! ابدأ بـ `!report`', ephemeral: true });
             }
 
             const reportId = client.reportCounter++;
@@ -231,7 +194,7 @@ client.on('interactionCreate', async (interaction) => {
                     { name: '🏷️ الاسم الظاهر', value: final.displayName, inline: true },
                     { name: '📝 التفاصيل', value: final.details, inline: false }
                 )
-                .setFooter({ text: `مقدم البلاغ: ${final.reporterTag}` })
+                .setFooter({ text: `مقدم: ${final.reporterTag}` })
                 .setTimestamp();
 
             if (final.evidence !== 'لا يوجد') {
@@ -258,15 +221,7 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             await interaction.update({
-                embeds: [new EmbedBuilder()
-                    .setColor('#00ff00')
-                    .setTitle('✅ تم إرسال البلاغ!')
-                    .setDescription(`رقم البلاغ: \`#${reportId}\``)
-                    .addFields(
-                        { name: '🎮 اللعبة', value: final.game, inline: true },
-                        { name: '⚠️ المخالفة', value: final.type, inline: true }
-                    )
-                ],
+                embeds: [new EmbedBuilder().setColor('#00ff00').setTitle('✅ تم الإرسال!').setDescription(`رقم: \`#${reportId}\``).addFields({ name: '🎮 اللعبة', value: final.game, inline: true }, { name: '⚠️ المخالفة', value: final.type, inline: true })],
                 components: []
             });
         }
@@ -284,14 +239,14 @@ client.on('interactionCreate', async (interaction) => {
             if (action === 'accept') {
                 report.status = '✅ مقبول';
                 await interaction.update({ components: [] });
-                await interaction.message.reply(`✅ تم **قبول** البلاغ #${reportId} بواسطة ${interaction.user}`);
+                await interaction.message.reply(`✅ تم قبول البلاغ #${reportId} بواسطة ${interaction.user}`);
                 if (reporter) await reporter.send(`✅ بلاغك #${reportId} تم قبوله!`).catch(() => {});
             }
             
             if (action === 'reject') {
                 report.status = '❌ مرفوض';
                 await interaction.update({ components: [] });
-                await interaction.message.reply(`❌ تم **رفض** البلاغ #${reportId} بواسطة ${interaction.user}`);
+                await interaction.message.reply(`❌ تم رفض البلاغ #${reportId} بواسطة ${interaction.user}`);
                 if (reporter) await reporter.send(`❌ بلاغك #${reportId} تم رفضه.`).catch(() => {});
             }
             
@@ -302,7 +257,7 @@ client.on('interactionCreate', async (interaction) => {
             
             if (action === 'ban') {
                 report.status = '🔨 محظور';
-                await interaction.message.reply(`🔨 تم **حظر** ${report.robloxUser} بواسطة ${interaction.user}`);
+                await interaction.message.reply(`🔨 تم حظر ${report.robloxUser} بواسطة ${interaction.user}`);
                 if (reporter) await reporter.send(`🎉 ${report.robloxUser} تم حظره بسبب بلاغك #${reportId}!`).catch(() => {});
             }
         }
@@ -315,22 +270,20 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// ✅ دالة لتسجيل الدخول (تُستدعى من Dashboard)
+// ========== دوال التحكم ==========
 client.loginWithToken = async (token) => {
     try {
         if (client.isLoggedIn) {
-            console.log('⚠️ Bot already logged in');
-            return { success: true, message: 'البوت شغال بالفعل!' };
+            return { success: true, message: 'البوت شغال!' };
         }
         await client.login(token);
-        return { success: true, message: '✅ تم تسجيل الدخول!' };
+        return { success: true, message: '✅ تم التشغيل!' };
     } catch (error) {
         console.error('Login error:', error);
-        return { success: false, message: '❌ خطأ في التوكن: ' + error.message };
+        return { success: false, message: '❌ توكن غلط!' };
     }
 };
 
-// ✅ دالة لتسجيل الخروج
 client.logoutBot = async () => {
     try {
         if (!client.isLoggedIn) {
@@ -338,24 +291,22 @@ client.logoutBot = async () => {
         }
         await client.destroy();
         client.isLoggedIn = false;
-        return { success: true, message: '⏹️ تم تسجيل الخروج!' };
+        return { success: true, message: '⏹️ تم الإيقاف!' };
     } catch (error) {
-        return { success: false, message: '❌ خطأ: ' + error.message };
+        return { success: false, message: '❌ خطأ!' };
     }
 };
 
-// ✅ دالة للحالة
 client.getBotStatus = () => {
     return {
-        isRunning: client.isLoggedIn,
-        ping: client.ws.ping || 0,
+        isRunning: client.isLoggedIn && client.user ? true : false,
+        ping: client.ws?.ping || 0,
         guilds: client.guilds?.cache?.size || 0,
         users: client.users?.cache?.size || 0,
         commands: client.commands?.size || 0
     };
 };
 
-// ✅ دالة للأوامر
 client.getBotCommands = () => {
     return Array.from(client.commands.values()).map(cmd => ({
         name: cmd.name,
@@ -365,7 +316,6 @@ client.getBotCommands = () => {
     }));
 };
 
-// ✅ ما نسجل دخول تلقائياً
 console.log('⏳ Waiting for token from Dashboard...');
 
 module.exports = client;
