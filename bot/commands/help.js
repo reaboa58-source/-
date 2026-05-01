@@ -7,7 +7,7 @@ module.exports = {
     async execute(message, args, client) {
         const embed = new EmbedBuilder()
             .setColor('#0099ff')
-            .setTitle('📚 الأوامر')
+            .setTitle(' الأوامر')
             .addFields(
                 { name: '!report', value: 'تقديم بلاغ' },
                 { name: '!reports', value: 'عرض البلاغات (إدارة)' },
