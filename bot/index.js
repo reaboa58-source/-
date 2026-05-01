@@ -1,7 +1,6 @@
 const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const config = require('./config'); // ✅ استخدام config.js
 
 const client = new Client({
     intents: [
@@ -15,6 +14,7 @@ const client = new Client({
 client.commands = new Collection();
 client.reports = new Map();
 client.reportCounter = 1;
+client.isLoggedIn = false;
 
 // ========== تحميل الأوامر ==========
 const commandsPath = path.join(__dirname, 'commands');
@@ -80,12 +80,13 @@ client.once('ready', () => {
     console.log(`🤖 Bot logged in as ${client.user.tag}`);
     console.log(`📊 In ${client.guilds.cache.size} servers`);
     console.log(`📋 Commands: ${client.commands.size}`);
+    client.isLoggedIn = true;
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith(config.prefix)) return; // ✅ استخدام prefix من config
+    if (message.author.bot || !message.content.startsWith('!')) return;
     
-    const args = message.content.slice(config.prefix.length).trim().split(/ +/);
+    const args = message.content.slice(1).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
     
     console.log(`📩 Command received: ${commandName}`);
@@ -108,7 +109,6 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
     try {
-        // اختيار اللعبة
         if (interaction.isStringSelectMenu() && interaction.customId === 'select_game') {
             const selectedGame = GAMES.find(g => g.value === interaction.values[0]);
             
@@ -158,7 +158,6 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.showModal(modal);
         }
 
-        // استلام معلومات البلاغ
         if (interaction.isModalSubmit() && interaction.customId.startsWith('report_info_')) {
             const gameValue = interaction.customId.replace('report_info_', '');
             const game = GAMES.find(g => g.value === gameValue);
@@ -198,7 +197,6 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
 
-        // اختيار نوع المخالفة
         if (interaction.isStringSelectMenu() && interaction.customId === 'select_report_type') {
             const selectedType = REPORT_TYPES.find(t => t.value === interaction.values[0]);
             const temp = client.reports.get(interaction.user.id);
@@ -273,7 +271,6 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
 
-        // أزرار الإدارة
         if (interaction.isButton()) {
             const [action, reportId] = interaction.customId.split('_');
             const report = client.reports.get(`report_${reportId}`);
@@ -318,5 +315,57 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// ✅ استخدام التوكن من config.js
-client.login(config.token);
+// ✅ دالة لتسجيل الدخول (تُستدعى من Dashboard)
+client.loginWithToken = async (token) => {
+    try {
+        if (client.isLoggedIn) {
+            console.log('⚠️ Bot already logged in');
+            return { success: true, message: 'البوت شغال بالفعل!' };
+        }
+        await client.login(token);
+        return { success: true, message: '✅ تم تسجيل الدخول!' };
+    } catch (error) {
+        console.error('Login error:', error);
+        return { success: false, message: '❌ خطأ في التوكن: ' + error.message };
+    }
+};
+
+// ✅ دالة لتسجيل الخروج
+client.logoutBot = async () => {
+    try {
+        if (!client.isLoggedIn) {
+            return { success: false, message: 'البوت مو شغال!' };
+        }
+        await client.destroy();
+        client.isLoggedIn = false;
+        return { success: true, message: '⏹️ تم تسجيل الخروج!' };
+    } catch (error) {
+        return { success: false, message: '❌ خطأ: ' + error.message };
+    }
+};
+
+// ✅ دالة للحالة
+client.getBotStatus = () => {
+    return {
+        isRunning: client.isLoggedIn,
+        ping: client.ws.ping || 0,
+        guilds: client.guilds?.cache?.size || 0,
+        users: client.users?.cache?.size || 0,
+        commands: client.commands?.size || 0
+    };
+};
+
+// ✅ دالة للأوامر
+client.getBotCommands = () => {
+    return Array.from(client.commands.values()).map(cmd => ({
+        name: cmd.name,
+        description: cmd.description || 'No description',
+        category: cmd.category || 'General',
+        usage: cmd.usage || `!${cmd.name}`
+    }));
+};
+
+// ✅ ما نسجل دخول تلقائياً
+console.log('⏳ Waiting for token from Dashboard...');
+
+module.exports = client;
