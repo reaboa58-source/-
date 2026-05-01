@@ -18,14 +18,24 @@ client.reportCounter = 1;
 
 // تحميل الأوامر
 const commandsPath = path.join(__dirname, 'commands');
+if (!fs.existsSync(commandsPath)) {
+    console.error('❌ مجلد commands مو موجود!');
+    fs.mkdirSync(commandsPath, { recursive: true });
+}
+
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+console.log(`📁 Found ${commandFiles.length} commands`);
 
 for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    if ('name' in command && 'execute' in command) {
-        client.commands.set(command.name, command);
-        console.log(`✅ Loaded: ${command.name}`);
+    try {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('name' in command && 'execute' in command) {
+            client.commands.set(command.name, command);
+            console.log(`✅ Loaded: ${command.name}`);
+        }
+    } catch (err) {
+        console.error(`❌ Error loading ${file}:`, err.message);
     }
 }
 
@@ -56,6 +66,7 @@ const REPORT_TYPES = [
 client.once('ready', () => {
     console.log(`🤖 Bot: ${client.user.tag}`);
     console.log(`📊 Servers: ${client.guilds.cache.size}`);
+    console.log(`📋 Commands: ${client.commands.size}`);
 });
 
 client.on('messageCreate', async (message) => {
