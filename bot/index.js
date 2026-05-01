@@ -1,4 +1,6 @@
 const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const client = new Client({
@@ -11,8 +13,23 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+client.reports = new Map();
+client.reportCounter = 1;
 
-// ========== الألعاب المتاحة ==========
+// ========== تحميل الأوامر ==========
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    if ('name' in command && 'execute' in command) {
+        client.commands.set(command.name, command);
+        console.log(`✅ Loaded command: ${command.name}`);
+    }
+}
+
+// ========== الألعاب والأنواع ==========
 const GAMES = [
     { name: 'Mini Games', value: 'minigames', emoji: '🎮' },
     { name: 'Timebomb Duels', value: 'timebombduels', emoji: '💣' },
@@ -26,7 +43,6 @@ const GAMES = [
     { name: 'لعبة أخرى', value: 'other', emoji: '❓' }
 ];
 
-// ========== أنواع البلاغات ==========
 const REPORT_TYPES = [
     { name: 'سندر (Sender/Exploiter)', value: 'sender', emoji: '🤖' },
     { name: 'أوتو كليك (Auto Clicker)', value: 'autoclick', emoji: '⚡' },
@@ -38,75 +54,29 @@ const REPORT_TYPES = [
     { name: 'سبب آخر', value: 'other', emoji: '❓' }
 ];
 
-// ========== حفظ البلاغات ==========
-client.reports = new Map();
-let reportCounter = 1;
-
 // ========== Event: Ready ==========
 client.once('ready', () => {
     console.log(`🤖 Bot logged in as ${client.user.tag}`);
     console.log(`📊 In ${client.guilds.cache.size} servers`);
+    console.log(`📋 Loaded ${client.commands.size} commands`);
 });
 
-// ========== Command: !report ==========
+// ========== Command Handler ==========
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     if (!message.content.startsWith('!')) return;
 
     const args = message.content.slice(1).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    const commandName = args.shift().toLowerCase();
 
-    if (command === 'report') {
-        // قائمة اختيار اللعبة
-        const gameSelect = new StringSelectMenuBuilder()
-            .setCustomId('select_game')
-            .setPlaceholder('🎮 اختر اللعبة...')
-            .addOptions(
-                GAMES.map(game => new StringSelectMenuOptionBuilder()
-                    .setLabel(game.name)
-                    .setValue(game.value)
-                    .setEmoji(game.emoji)
-                    .setDescription(`بلاغ في لعبة ${game.name}`)
-                )
-            );
+    const command = client.commands.get(commandName);
+    if (!command) return;
 
-        const row = new ActionRowBuilder().addComponents(gameSelect);
-
-        const embed = new EmbedBuilder()
-            .setColor('#ff0000')
-            .setTitle('🚨 نظام البلاغات - Roblox')
-            .setDescription('مرحباً بك في نظام البلاغات!\n\n**الخطوات:**\n1️⃣ اختر اللعبة من القائمة\n2️⃣ اكتب معلومات المبلغ عنه\n3️⃣ اختر نوع المخالفة\n4️⃣ أرسل البلاغ\n\n⚠️ **تنبيه:** البلاغات الكاذبة تؤدي للحظر!')
-            .setFooter({ text: 'Roblox Report System' })
-            .setTimestamp();
-
-        await message.reply({
-            embeds: [embed],
-            components: [row]
-        });
-    }
-
-    if (command === 'reports') {
-        // للإدارة: عرض كل البلاغات
-        if (!message.member.permissions.has('Administrator')) {
-            return message.reply('❌ هذا الأمر للإدارة فقط!');
-        }
-
-        const reports = Array.from(client.reports.values());
-        if (reports.length === 0) {
-            return message.reply('📭 ما فيه بلاغات حالياً.');
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle(`📋 قائمة البلاغات (${reports.length})`)
-            .setDescription(
-                reports.map(r => 
-                    `\`#${r.id}\` | **${r.target}** | ${r.game} | ${r.type} | ${r.status}`
-                ).join('\n')
-            )
-            .setTimestamp();
-
-        await message.reply({ embeds: [embed] });
+    try {
+        await command.execute(message, args, client);
+    } catch (error) {
+        console.error(`Error executing ${commandName}:`, error);
+        message.reply('❌ حصل خطأ!');
     }
 });
 
@@ -117,7 +87,6 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isStringSelectMenu() && interaction.customId === 'select_game') {
             const selectedGame = GAMES.find(g => g.value === interaction.values[0]);
 
-            // فتح Modal لإدخال المعلومات
             const modal = new ModalBuilder()
                 .setCustomId(`report_info_${selectedGame.value}`)
                 .setTitle(`🎮 بلاغ - ${selectedGame.name}`);
@@ -174,7 +143,6 @@ client.on('interactionCreate', async (interaction) => {
             const details = interaction.fields.getTextInputValue('report_details');
             const evidence = interaction.fields.getTextInputValue('evidence') || 'لا يوجد';
 
-            // حفظ البلاغ مؤقتاً
             const tempReport = {
                 reporter: interaction.user.id,
                 reporterTag: interaction.user.tag,
@@ -188,7 +156,6 @@ client.on('interactionCreate', async (interaction) => {
 
             client.reports.set(interaction.user.id, tempReport);
 
-            // قائمة اختيار نوع المخالفة
             const typeSelect = new StringSelectMenuBuilder()
                 .setCustomId('select_report_type')
                 .setPlaceholder('⚠️ اختر نوع المخالفة...')
@@ -205,7 +172,7 @@ client.on('interactionCreate', async (interaction) => {
             const embed = new EmbedBuilder()
                 .setColor('#ffaa00')
                 .setTitle('⚠️ اختر نوع المخالفة')
-                .setDescription(`**الشخص:** ${robloxUser}\n**اللعبة:** ${game.name}\n\nاختر نوع المخالفة من القائمة:`)
+                .setDescription(`**الشخص:** ${robloxUser}\n**اللعبة:** ${game.name}\n\nاختر نوع المخالفة:`)
                 .setTimestamp();
 
             await interaction.reply({
@@ -227,8 +194,7 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
-            // إنشاء البلاغ النهائي
-            const reportId = reportCounter++;
+            const reportId = client.reportCounter++;
             const finalReport = {
                 id: reportId,
                 ...tempReport,
@@ -241,7 +207,6 @@ client.on('interactionCreate', async (interaction) => {
             client.reports.set(`report_${reportId}`, finalReport);
             client.reports.delete(interaction.user.id);
 
-            // Embed البلاغ النهائي
             const reportEmbed = new EmbedBuilder()
                 .setColor('#ff0000')
                 .setTitle(`🚨 بلاغ #${reportId}`)
@@ -260,7 +225,6 @@ client.on('interactionCreate', async (interaction) => {
                 reportEmbed.addFields({ name: '📎 دليل', value: finalReport.evidence, inline: false });
             }
 
-            // أزرار الإدارة
             const adminButtons = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`accept_${reportId}`)
@@ -280,7 +244,6 @@ client.on('interactionCreate', async (interaction) => {
                     .setStyle(ButtonStyle.Secondary)
             );
 
-            // إرسال للروم المخصص للبلاغات
             const reportChannel = interaction.guild.channels.cache.find(
                 ch => ch.name.includes('reports') || 
                       ch.name.includes('بلاغات') || 
@@ -289,17 +252,16 @@ client.on('interactionCreate', async (interaction) => {
 
             if (reportChannel) {
                 await reportChannel.send({
-                    content: `📢 <@&ADMIN_ROLE_ID> بلاغ جديد!\nمقدم البلاغ: <@${finalReport.reporter}>`,
+                    content: `📢 بلاغ جديد من <@${finalReport.reporter}>`,
                     embeds: [reportEmbed],
                     components: [adminButtons]
                 });
             }
 
-            // تأكيد للمستخدم
             const confirmEmbed = new EmbedBuilder()
                 .setColor('#00ff00')
                 .setTitle('✅ تم إرسال البلاغ!')
-                .setDescription(`رقم البلاغ: \`#${reportId}\`\nتم إرساله للإدارة للمراجعة.`)
+                .setDescription(`رقم البلاغ: \`#${reportId}\`\nتم إرساله للإدارة.`)
                 .addFields(
                     { name: '🎮 اللعبة', value: finalReport.game, inline: true },
                     { name: '⚠️ المخالفة', value: finalReport.type, inline: true }
@@ -328,63 +290,33 @@ client.on('interactionCreate', async (interaction) => {
 
             if (action === 'accept') {
                 report.status = '✅ مقبول';
-                await interaction.update({
-                    components: []
-                });
-                await interaction.message.reply({
-                    content: `✅ تم **قبول** البلاغ #${reportId} بواسطة ${interaction.user}`
-                });
-                if (reporter) {
-                    await reporter.send(`✅ بلاغك #${reportId} تم قبوله!`).catch(() => {});
-                }
+                await interaction.update({ components: [] });
+                await interaction.message.reply(`✅ تم **قبول** البلاغ #${reportId} بواسطة ${interaction.user}`);
+                if (reporter) await reporter.send(`✅ بلاغك #${reportId} تم قبوله!`).catch(() => {});
             }
 
             if (action === 'reject') {
                 report.status = '❌ مرفوض';
-                await interaction.update({
-                    components: []
-                });
-                await interaction.message.reply({
-                    content: `❌ تم **رفض** البلاغ #${reportId} بواسطة ${interaction.user}`
-                });
-                if (reporter) {
-                    await reporter.send(`❌ بلاغك #${reportId} تم رفضه.`).catch(() => {});
-                }
+                await interaction.update({ components: [] });
+                await interaction.message.reply(`❌ تم **رفض** البلاغ #${reportId} بواسطة ${interaction.user}`);
+                if (reporter) await reporter.send(`❌ بلاغك #${reportId} تم رفضه.`).catch(() => {});
             }
 
             if (action === 'investigate') {
                 report.status = '🔍 قيد التحقيق';
-                await interaction.message.reply({
-                    content: `🔍 ${interaction.user} يحقق في البلاغ #${reportId}...`
-                });
+                await interaction.message.reply(`🔍 ${interaction.user} يحقق في البلاغ #${reportId}...`);
             }
 
             if (action === 'ban') {
                 report.status = '🔨 محظور';
-                await interaction.message.reply({
-                    content: `🔨 تم **حظر** ${report.robloxUser} من اللعبة بواسطة ${interaction.user}`
-                });
-                if (reporter) {
-                    await reporter.send(`🎉 ${report.robloxUser} تم حظره بسبب بلاغك #${reportId}!`).catch(() => {});
-                }
+                await interaction.message.reply(`🔨 تم **حظر** ${report.robloxUser} بواسطة ${interaction.user}`);
+                if (reporter) await reporter.send(`🎉 ${report.robloxUser} تم حظره بسبب بلاغك #${reportId}!`).catch(() => {});
             }
         }
 
     } catch (error) {
         console.error('Interaction error:', error);
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({
-                content: '❌ حصل خطأ! جرب مرة ثانية.',
-                ephemeral: true
-            }).catch(() => {});
-        } else {
-            await interaction.reply({
-                content: '❌ حصل خطأ! جرب مرة ثانية.',
-                ephemeral: true
-            }).catch(() => {});
-        }
     }
 });
 
-// ========== Login ==========
 client.login(process.env.DISCORD_TOKEN);
