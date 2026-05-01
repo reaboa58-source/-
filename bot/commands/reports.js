@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 module.exports = {
     name: 'reports',
-    description: 'عرض البلاغات',
+    description: 'عرض الفضايح',
     category: 'إدارة',
     usage: '!reports',
     async execute(message, args, client) {
@@ -11,7 +11,7 @@ module.exports = {
         
         const embed = new EmbedBuilder()
             .setColor('#0099ff')
-            .setTitle(`📋 البلاغات (${reports.length})`)
+            .setTitle(` فضايح (${reports.length})`)
             .setDescription(reports.slice(0, 10).map(r => `\`#${r.id}\` | **${r.robloxUser}** | ${r.game} | ${r.type} | ${r.status}`).join('\n'));
         message.reply({ embeds: [embed] });
     }
