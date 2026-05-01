@@ -6,9 +6,9 @@ const PORT = process.env.PORT || 3000;
 // تشغيل البوت
 try {
     require('../bot/index');
-    console.log('🤖 Bot started from dashboard');
+    console.log('🤖 Bot module loaded');
 } catch (err) {
-    console.error('❌ Bot error:', err.message);
+    console.error('❌ Bot load error:', err.message);
 }
 
 app.use(express.json());
