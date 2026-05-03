@@ -30,6 +30,26 @@ module.exports = {
             )
             .setFooter({ text: `مقدم: ${report.reporterTag}` });
 
-        message.reply({ embeds: [embed] });
+        // ✅ التحقق من الرابط في الإيمبد
+        if (report.evidence && report.evidence !== 'مافيه رابط') {
+            embed.addFields({ 
+                name: 'رابط الفيديو', 
+                value: report.evidence, 
+                inline: false 
+            });
+        } else {
+            embed.addFields({ 
+                name: 'رابط الفيديو', 
+                value: 'مافيه رابط', 
+                inline: false 
+            });
+        }
+
+        await message.reply({ embeds: [embed] });
+
+        // ✅ نرسل الرابط منفصل إذا موجود
+        if (report.evidence && report.evidence !== 'مافيه رابط') {
+            await message.channel.send(`**رابط الفيديو:**\n${report.evidence}`);
+        }
     }
 };
