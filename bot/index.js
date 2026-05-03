@@ -16,7 +16,6 @@ client.reports = new Map();
 client.reportCounter = 1;
 client.isLoggedIn = false;
 
-// تحميل الأوامر
 const commandsPath = path.join(__dirname, 'commands');
 
 if (!fs.existsSync(commandsPath)) {
@@ -45,7 +44,6 @@ try {
 
 console.log(`Total commands: ${client.commands.size}`);
 
-// لعبتين بس
 const GAMES = [
     { name: 'Timebomb Duels', value: 'timebombduels' },
     { name: 'Custom Minigames', value: 'customminigames' }
@@ -53,7 +51,7 @@ const GAMES = [
 
 const REPORT_TYPES = [
     { name: 'سندر', value: 'sender' },
-    { name: 'اوتو تراك', value: 'autoclick' },
+    { name: 'اوتو كليك', value: 'autoclick' },
     { name: 'سبام', value: 'spam' },
     { name: 'قذف', value: 'harassment' },
     { name: 'هاك', value: 'hack' },
@@ -120,7 +118,7 @@ client.on('interactionCreate', async (interaction) => {
 
             const evidenceInput = new TextInputBuilder()
                 .setCustomId('evidence')
-                .setLabel('رابط صورة او فيديو')
+                .setLabel('رابط صورة او فيديو (اختياري)')
                 .setStyle(TextInputStyle.Short)
                 .setPlaceholder('https://...')
                 .setRequired(false)
@@ -143,7 +141,12 @@ client.on('interactionCreate', async (interaction) => {
             const robloxUser = interaction.fields.getTextInputValue('roblox_username');
             const displayName = interaction.fields.getTextInputValue('display_name') || 'غير محدد';
             const details = interaction.fields.getTextInputValue('report_details');
-            const evidence = interaction.fields.getTextInputValue('evidence') || 'لا يوجد';
+            
+            // ✅ التحقق من الرابط: إذا فاضي نحط "مافيه رابط"
+            let evidence = interaction.fields.getTextInputValue('evidence');
+            if (!evidence || evidence.trim() === '') {
+                evidence = 'مافيه رابط';
+            }
 
             client.reports.set(interaction.user.id, {
                 reporter: interaction.user.id,
@@ -211,10 +214,17 @@ client.on('interactionCreate', async (interaction) => {
                 .setFooter({ text: `مقدم البلاغ: ${final.reporterTag}` })
                 .setTimestamp();
 
-            if (final.evidence !== 'لا يوجد') {
+            // ✅ التحقق من الرابط في الإيمبد
+            if (final.evidence !== 'مافيه رابط') {
                 embed.addFields({ 
                     name: 'الدليل', 
                     value: `[اضغط هنا](${final.evidence})`, 
+                    inline: false 
+                });
+            } else {
+                embed.addFields({ 
+                    name: 'الدليل', 
+                    value: 'مافيه رابط', 
                     inline: false 
                 });
             }
@@ -233,7 +243,8 @@ client.on('interactionCreate', async (interaction) => {
             if (channel) {
                 let messageContent = `فضيحه جديده من <@${final.reporter}>`;
                 
-                if (final.evidence !== 'لا يوجد') {
+                // ✅ نرسل الرابط منفصل إذا موجود
+                if (final.evidence !== 'مافيه رابط') {
                     messageContent += `\n\n**رابط الفيديو:**\n${final.evidence}`;
                 }
 
