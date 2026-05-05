@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
     name: 'تكت',
@@ -7,8 +7,10 @@ module.exports = {
     usage: '!تكت',
 
     async execute(message, args, client) {
-        // نتحقق إذا عنده تكت مفتوح
-        const existingTicket = client.tickets?.find(t => t.userId === message.author.id && t.status === 'open');
+        const existingTicket = Array.from(client.tickets.values()).find(t => 
+            t.userId === message.author.id && t.status === 'open'
+        );
+        
         if (existingTicket) {
             return message.reply(`عندك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`);
         }
@@ -26,13 +28,6 @@ module.exports = {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        const msg = await message.reply({ embeds: [embed], components: [row] });
-
-        // نحفظ رسالة التكت عشان نتعامل مع الزر
-        if (!client.ticketMessages) client.ticketMessages = new Map();
-        client.ticketMessages.set(message.author.id, {
-            messageId: msg.id,
-            channelId: msg.channel.id
-        });
+        await message.reply({ embeds: [embed], components: [row] });
     }
 };
