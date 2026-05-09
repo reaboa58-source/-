@@ -1,704 +1,615 @@
-const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection, StreamType } = require('@discordjs/voice');
-const googleTTS = require('google-tts-api');
+// index.js - بوت حماية كامل لـ Viirless
+const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildPresences
+  ]
 });
 
 client.commands = new Collection();
-client.reports = new Map();
-client.tickets = new Map();
-client.reportCounter = 1;
-client.ticketCounter = 1;
-client.isLoggedIn = false;
+client.antiraid = new Map();
+client.antispam = new Map();
+client.antilink = new Map();
+client.antinuke = new Map();
+client.blacklist = new Set();
+client.whitelist = new Map();
+client.logs = new Map();
+client.punishments = new Map();
 
-// تحميل الأوامر
-const commandsPath = path.join(__dirname, 'commands');
+// ===== دالات مساعدة =====
 
-if (!fs.existsSync(commandsPath)) {
-    console.log('Creating commands folder...');
-    fs.mkdirSync(commandsPath, { recursive: true });
+function isOwner(member) {
+  return member.id === member.guild.ownerId;
 }
 
-try {
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        try {
-            const filePath = path.join(commandsPath, file);
-            delete require.cache[require.resolve(filePath)];
-            const command = require(filePath);
-            if (command.name && command.execute) {
-                client.commands.set(command.name, command);
-                console.log(`Loaded: ${command.name}`);
-            }
-        } catch (err) {
-            console.error(`Error loading ${file}:`, err.message);
-        }
-    }
-} catch (err) {
-    console.error('Error reading commands:', err.message);
+function isAdmin(member) {
+  return member.permissions.has(PermissionsBitField.Flags.Administrator) || isOwner(member);
 }
 
-console.log(`Total commands: ${client.commands.size}`);
+function isTrusted(member) {
+  if (isAdmin(member)) return true;
+  const trusted = client.whitelist.get(member.guild.id);
+  return trusted && trusted.has(member.id);
+}
 
-// بيانات الفضائح
-const GAMES = [
-    { name: 'Timebomb Duels', value: 'timebombduels' },
-    { name: 'Custom Minigames', value: 'customminigames' }
-];
+function sendLog(guild, title, description, color = 0xFF0000) {
+  const logChannelId = client.logs.get(guild.id);
+  if (!logChannelId) return;
+  const channel = guild.channels.cache.get(logChannelId);
+  if (!channel) return;
+  
+  channel.send({
+    embeds: [{
+      color,
+      title,
+      description,
+      timestamp: new Date(),
+      footer: { text: 'نظام الحماية' }
+    }]
+  }).catch(() => {});
+}
 
-const REPORT_TYPES = [
-    { name: 'سندر', value: 'sender' },
-    { name: 'اوتو كليك', value: 'autoclick' },
-    { name: 'سبام', value: 'spam' },
-    { name: 'قذف', value: 'harassment' },
-    { name: 'هاك', value: 'hack' },
-    { name: 'تخريب', value: 'griefing' },
-    { name: 'انتحال', value: 'impersonation' },
-    { name: 'سبب اخر', value: 'other' }
-];
+function punish(member, reason, type = 'kick') {
+  if (isTrusted(member)) return false;
+  
+  const guild = member.guild;
+  const botMember = guild.members.me;
+  
+  if (!botMember.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return false;
+  
+  switch(type) {
+    case 'kick':
+      if (!botMember.permissions.has(PermissionsBitField.Flags.KickMembers)) return false;
+      member.kick(reason).catch(() => {});
+      break;
+    case 'ban':
+      if (!botMember.permissions.has(PermissionsBitField.Flags.BanMembers)) return false;
+      member.ban({ reason, deleteMessageSeconds: 86400 }).catch(() => {});
+      break;
+    case 'mute':
+      if (!botMember.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return false;
+      member.timeout(3600000, reason).catch(() => {});
+      break;
+  }
+  
+  sendLog(guild, `🛡️ حماية - ${type.toUpperCase()}`, 
+    `**العضو:** ${member.user.tag} (${member.id})\n**السبب:** ${reason}`, 0xFF0000);
+  
+  return true;
+}
 
-client.once('ready', () => {
-    console.log(`Bot: ${client.user.tag}`);
-    console.log(`Servers: ${client.guilds.cache.size}`);
-    client.isLoggedIn = true;
+// ===== ===== ===== الأوامر ===== ===== =====
+
+// 1. ping
+client.commands.set('ping', {
+  name: 'ping',
+  category: 'عام',
+  description: 'سرعة البوت',
+  execute(message) {
+    const ws = client.ws.ping;
+    const msg = Date.now() - message.createdTimestamp;
+    message.reply(`🏓 **Pong!**\nAPI: ${ws}ms\nBot: ${msg}ms`);
+  }
 });
+
+// 2. setlog
+client.commands.set('setlog', {
+  name: 'setlog',
+  category: 'اعدادات',
+  description: 'تحديد روم اللوق',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const channel = message.mentions.channels.first();
+    if (!channel) return message.reply('منشن الروم!');
+    
+    client.logs.set(message.guild.id, channel.id);
+    message.reply(`✅ تم تعيين روم اللوق: ${channel}`);
+  }
+});
+
+// 3. whitelist
+client.commands.set('whitelist', {
+  name: 'whitelist',
+  category: 'اعدادات',
+  description: 'إضافة/حذف عضو من القائمة البيضاء',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const target = message.mentions.members.first();
+    if (!target) return message.reply('منشن العضو!');
+    
+    const guildId = message.guild.id;
+    if (!client.whitelist.has(guildId)) client.whitelist.set(guildId, new Set());
+    const list = client.whitelist.get(guildId);
+    
+    if (list.has(target.id)) {
+      list.delete(target.id);
+      message.reply(`✅ تم حذف ${target.user.tag} من القائمة البيضاء`);
+    } else {
+      list.add(target.id);
+      message.reply(`✅ تم إضافة ${target.user.tag} للقائمة البيضاء`);
+    }
+  }
+});
+
+// 4. antiraid
+client.commands.set('antiraid', {
+  name: 'antiraid',
+  category: 'حماية',
+  description: 'تفعيل/تعطيل حماية الريد',
+  execute(message, args) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const status = args[0]?.toLowerCase();
+    if (!['on', 'off'].includes(status)) return message.reply('الاستخدام: !antiraid on/off');
+    
+    client.antiraid.set(message.guild.id, status === 'on');
+    message.reply(`🛡️ حماية الريد: **${status === 'on' ? 'مفعلة' : 'معطلة'}**`);
+  }
+});
+
+// 5. antispam
+client.commands.set('antispam', {
+  name: 'antispam',
+  category: 'حماية',
+  description: 'تفعيل/تعطيل حماية السبام',
+  execute(message, args) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const status = args[0]?.toLowerCase();
+    if (!['on', 'off'].includes(status)) return message.reply('الاستخدام: !antispam on/off');
+    
+    client.antispam.set(message.guild.id, status === 'on');
+    message.reply(`🛡️ حماية السبام: **${status === 'on' ? 'مفعلة' : 'معطلة'}**`);
+  }
+});
+
+// 6. antilink
+client.commands.set('antilink', {
+  name: 'antilink',
+  category: 'حماية',
+  description: 'تفعيل/تعطيل حماية الروابط',
+  execute(message, args) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const status = args[0]?.toLowerCase();
+    if (!['on', 'off'].includes(status)) return message.reply('الاستخدام: !antilink on/off');
+    
+    client.antilink.set(message.guild.id, status === 'on');
+    message.reply(`🛡️ حماية الروابط: **${status === 'on' ? 'مفعلة' : 'معطلة'}**`);
+  }
+});
+
+// 7. antinuke
+client.commands.set('antinuke', {
+  name: 'antinuke',
+  category: 'حماية',
+  description: 'تفعيل/تعطيل حماية النوك',
+  execute(message, args) {
+    if (!isOwner(message.member)) return message.reply('للمالك فقط!');
+    const status = args[0]?.toLowerCase();
+    if (!['on', 'off'].includes(status)) return message.reply('الاستخدام: !antinuke on/off');
+    
+    client.antinuke.set(message.guild.id, status === 'on');
+    message.reply(`🛡️ حماية النوك: **${status === 'on' ? 'مفعلة' : 'معطلة'}**`);
+  }
+});
+
+// 8. blacklist
+client.commands.set('blacklist', {
+  name: 'blacklist',
+  category: 'حماية',
+  description: 'إضافة/حذف عضو من القائمة السوداء',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const target = message.mentions.members.first();
+    if (!target) return message.reply('منشن العضو!');
+    
+    if (client.blacklist.has(target.id)) {
+      client.blacklist.delete(target.id);
+      message.reply(`✅ تم حذف ${target.user.tag} من القائمة السوداء`);
+    } else {
+      client.blacklist.add(target.id);
+      message.reply(`🚫 تم إضافة ${target.user.tag} للقائمة السوداء`);
+      target.kick('القائمة السوداء').catch(() => {});
+    }
+  }
+});
+
+// 9. settings
+client.commands.set('settings', {
+  name: 'settings',
+  category: 'حماية',
+  description: 'عرض إعدادات الحماية',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    const guildId = message.guild.id;
+    
+    message.reply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🛡️ إعدادات الحماية',
+        fields: [
+          { name: 'حماية الريد', value: client.antiraid.get(guildId) ? '🟢 مفعلة' : '🔴 معطلة', inline: true },
+          { name: 'حماية السبام', value: client.antispam.get(guildId) ? '🟢 مفعلة' : '🔴 معطلة', inline: true },
+          { name: 'حماية الروابط', value: client.antilink.get(guildId) ? '🟢 مفعلة' : '🔴 معطلة', inline: true },
+          { name: 'حماية النوك', value: client.antinuke.get(guildId) ? '🟢 مفعلة' : '🔴 معطلة', inline: true },
+          { name: 'روم اللوق', value: client.logs.get(guildId) ? `<#${client.logs.get(guildId)}>` : 'غير محدد', inline: false }
+        ]
+      }]
+    });
+  }
+});
+
+// 10. lockdown
+client.commands.set('lockdown', {
+  name: 'lockdown',
+  category: 'حماية',
+  description: 'قفل كل الرومات في حالة الطوارئ',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    
+    message.guild.channels.cache.forEach(channel => {
+      if (channel.isTextBased()) {
+        channel.permissionOverwrites.edit(message.guild.id, { SendMessages: false }).catch(() => {});
+      }
+    });
+    
+    message.reply('🔒 **تم تفعيل وضع الطوارئ - كل الرومات مقفولة**');
+    sendLog(message.guild, '🚨 طوارئ', `تم تفعيل وضع الطوارئ بواسطة ${message.author.tag}`, 0xFF0000);
+  }
+});
+
+// 11. unlockdown
+client.commands.set('unlockdown', {
+  name: 'unlockdown',
+  category: 'حماية',
+  description: 'فك قفل الرومات',
+  execute(message) {
+    if (!isAdmin(message.member)) return message.reply('للأدمن فقط!');
+    
+    message.guild.channels.cache.forEach(channel => {
+      if (channel.isTextBased()) {
+        channel.permissionOverwrites.edit(message.guild.id, { SendMessages: true }).catch(() => {});
+      }
+    });
+    
+    message.reply('🔓 **تم إلغاء وضع الطوارئ - الرومات مفتوحة**');
+    sendLog(message.guild, '✅ إلغاء طوارئ', `تم إلغاء وضع الطوارئ بواسطة ${message.author.tag}`, 0x00FF00);
+  }
+});
+
+// 12. ban
+client.commands.set('ban', {
+  name: 'ban',
+  category: 'ادارة',
+  description: 'حظر عضو',
+  execute(message, args) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) return message.reply('ما عندك صلاحية!');
+    const user = message.mentions.users.first();
+    if (!user) return message.reply('منشن شخص!');
+    
+    const reason = args.slice(1).join(' ') || 'بدون سبب';
+    message.guild.members.ban(user, { reason, deleteMessageSeconds: 86400 }).then(() => {
+      message.reply(`✅ تم حظر ${user.tag} | السبب: ${reason}`);
+      sendLog(message.guild, '🔨 حظر يدوي', `**العضو:** ${user.tag}\n**بواسطة:** ${message.author.tag}\n**السبب:** ${reason}`, 0xFF0000);
+    }).catch(() => message.reply('❌ ما قدرت!'));
+  }
+});
+
+// 13. kick
+client.commands.set('kick', {
+  name: 'kick',
+  category: 'ادارة',
+  description: 'طرد عضو',
+  execute(message, args) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) return message.reply('ما عندك صلاحية!');
+    const member = message.mentions.members.first();
+    if (!member) return message.reply('منشن شخص!');
+    
+    const reason = args.slice(1).join(' ') || 'بدون سبب';
+    member.kick(reason).then(() => {
+      message.reply(`✅ تم طرد ${member.user.tag} | السبب: ${reason}`);
+      sendLog(message.guild, '👢 طرد يدوي', `**العضو:** ${member.user.tag}\n**بواسطة:** ${message.author.tag}\n**السبب:** ${reason}`, 0xFFA500);
+    }).catch(() => message.reply('❌ ما قدرت!'));
+  }
+});
+
+// 14. mute
+client.commands.set('mute', {
+  name: 'mute',
+  category: 'ادارة',
+  description: 'كتم عضو',
+  execute(message, args) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return message.reply('ما عندك صلاحية!');
+    const member = message.mentions.members.first();
+    if (!member) return message.reply('منشن شخص!');
+    
+    const duration = args[1] || '1h';
+    const ms = duration.endsWith('m') ? parseInt(duration) * 60000 :
+               duration.endsWith('h') ? parseInt(duration) * 3600000 :
+               duration.endsWith('d') ? parseInt(duration) * 86400000 : 3600000;
+    
+    const reason = args.slice(2).join(' ') || 'بدون سبب';
+    member.timeout(ms, reason).then(() => {
+      message.reply(`✅ تم كتم ${member.user.tag} لمدة ${duration} | السبب: ${reason}`);
+    }).catch(() => message.reply('❌ ما قدرت!'));
+  }
+});
+
+// 15. unmute
+client.commands.set('unmute', {
+  name: 'unmute',
+  category: 'ادارة',
+  description: 'فك كتم عضو',
+  execute(message) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return message.reply('ما عندك صلاحية!');
+    const member = message.mentions.members.first();
+    if (!member) return message.reply('منشن شخص!');
+    
+    member.timeout(null).then(() => {
+      message.reply(`✅ تم فك كتم ${member.user.tag}`);
+    }).catch(() => message.reply('❌ ما قدرت!'));
+  }
+});
+
+// 16. clear
+client.commands.set('clear', {
+  name: 'clear',
+  category: 'ادارة',
+  description: 'حذف رسائل',
+  execute(message, args) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return message.reply('ما عندك صلاحية!');
+    const amount = parseInt(args[0]);
+    if (!amount || amount < 1 || amount > 100) return message.reply('اكتب رقم من 1-100!');
+    
+    message.channel.bulkDelete(amount + 1).then(() => {
+      message.channel.send(`✅ تم حذف ${amount} رسالة`).then(m => setTimeout(() => m.delete(), 3000));
+    });
+  }
+});
+
+// 17. userinfo
+client.commands.set('userinfo', {
+  name: 'userinfo',
+  category: 'عام',
+  description: 'معلومات العضو',
+  execute(message) {
+    const user = message.mentions.users.first() || message.author;
+    const member = message.guild.members.cache.get(user.id);
+    
+    message.reply({
+      embeds: [{
+        color: 0x5865F2,
+        title: `👤 ${user.username}`,
+        thumbnail: { url: user.displayAvatarURL() },
+        fields: [
+          { name: 'الايدي', value: user.id, inline: true },
+          { name: 'الحالة', value: member?.presence?.status || 'غير معروف', inline: true },
+          { name: 'الانضمام', value: member ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'غير معروف', inline: true },
+          { name: 'الحساب', value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+          { name: 'بوت؟', value: user.bot ? 'نعم' : 'لا', inline: true },
+          { name: 'موثق؟', value: user.flags?.has('VerifiedBot') ? 'نعم' : 'لا', inline: true }
+        ]
+      }]
+    });
+  }
+});
+
+// 18. serverinfo
+client.commands.set('serverinfo', {
+  name: 'serverinfo',
+  category: 'عام',
+  description: 'معلومات السيرفر',
+  execute(message) {
+    const guild = message.guild;
+    message.reply({
+      embeds: [{
+        color: 0x5865F2,
+        title: `🏰 ${guild.name}`,
+        thumbnail: { url: guild.iconURL() },
+        fields: [
+          { name: 'الاعضاء', value: `${guild.memberCount}`, inline: true },
+          { name: 'الرومات', value: `${guild.channels.cache.size}`, inline: true },
+          { name: 'الرتب', value: `${guild.roles.cache.size}`, inline: true },
+          { name: 'المالك', value: `<@${guild.ownerId}>`, inline: true },
+          { name: 'الحماية', value: guild.verificationLevel, inline: true },
+          { name: 'البوتات', value: `${guild.members.cache.filter(m => m.user.bot).size}`, inline: true }
+        ]
+      }]
+    });
+  }
+});
+
+// 19. help
+client.commands.set('help', {
+  name: 'help',
+  category: 'عام',
+  description: 'قائمة الأوامر',
+  execute(message) {
+    const categories = { 'حماية': [], 'اعدادات': [], 'ادارة': [], 'عام': [] };
+    
+    client.commands.forEach(cmd => {
+      if (cmd.name === 'help') return;
+      const line = `\`!${cmd.name}\` - ${cmd.description}`;
+      if (categories[cmd.category]) categories[cmd.category].push(line);
+    });
+    
+    message.reply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🛡️ قائمة أوامر الحماية',
+        fields: [
+          { name: '🛡️ الحماية', value: categories['حماية'].join('\n') || 'لا يوجد', inline: false },
+          { name: '⚙️ الإعدادات', value: categories['اعدادات'].join('\n') || 'لا يوجد', inline: false },
+          { name: '🔨 الإدارة', value: categories['ادارة'].join('\n') || 'لا يوجد', inline: false },
+          { name: '📋 العامة', value: categories['عام'].join('\n') || 'لا يوجد', inline: false }
+        ],
+        footer: { text: `Viirless Protection - ${client.commands.size} امر` }
+      }]
+    });
+  }
+});
+
+// ===== ===== ===== أنظمة الحماية ===== ===== =====
+
+// نظام السبام
+const spamMap = new Map();
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith('!')) return;
-    
-    const args = message.content.slice(1).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-    
-    const command = client.commands.get(commandName);
-    if (!command) return;
-    
-    try {
-        await command.execute(message, args, client);
-    } catch (error) {
-        console.error(`Error in ${commandName}:`, error);
-        message.reply('حصل خطأ!').catch(() => {});
+  if (message.author.bot || !message.guild) return;
+  
+  // القائمة السوداء
+  if (client.blacklist.has(message.author.id)) {
+    message.delete().catch(() => {});
+    message.member.kick('القائمة السوداء').catch(() => {});
+    return;
+  }
+  
+  const guildId = message.guild.id;
+  
+  // حماية الروابط
+  if (client.antilink.get(guildId) && !isTrusted(message.member)) {
+    const linkRegex = /(https?:\/\/|www\.|discord\.gg|discord\.com\/invite)/i;
+    if (linkRegex.test(message.content)) {
+      message.delete().catch(() => {});
+      punish(message.member, 'إرسال روابط', 'mute');
+      message.channel.send(`🚫 ${message.author} ممنوع إرسال الروابط!`).then(m => setTimeout(() => m.delete(), 5000));
+      return;
     }
+  }
+  
+  // حماية السبام
+  if (client.antispam.get(guildId) && !isTrusted(message.member)) {
+    const key = `${guildId}-${message.author.id}`;
+    const now = Date.now();
+    
+    if (!spamMap.has(key)) spamMap.set(key, []);
+    const userMessages = spamMap.get(key).filter(t => now - t < 5000);
+    userMessages.push(now);
+    spamMap.set(key, userMessages);
+    
+    if (userMessages.length > 5) {
+      message.channel.bulkDelete(userMessages.length, true).catch(() => {});
+      punish(message.member, 'سبام', 'mute');
+      message.channel.send(`🚫 ${message.author} تم كتمك بسبب السبام!`).then(m => setTimeout(() => m.delete(), 5000));
+      return;
+    }
+  }
+  
+  // معالجة الأوامر
+  if (!message.content.startsWith('!')) return;
+  
+  const args = message.content.slice(1).trim().split(/ +/);
+  const commandName = args.shift().toLowerCase();
+  
+  const command = client.commands.get(commandName);
+  if (!command) return;
+  
+  try {
+    command.execute(message, args);
+  } catch (error) {
+    console.error(error);
+    message.reply('❌ صار خطأ!');
+  }
 });
 
-client.on('interactionCreate', async (interaction) => {
-    try {
-        // ========== فضائح: اختيار اللعبة ==========
-        if (interaction.isStringSelectMenu() && interaction.customId === 'select_game') {
-            const selectedGame = GAMES.find(g => g.value === interaction.values[0]);
-            
-            const modal = new ModalBuilder()
-                .setCustomId(`report_info_${selectedGame.value}`)
-                .setTitle(`فضيحه - ${selectedGame.name}`);
-
-            const robloxUserInput = new TextInputBuilder()
-                .setCustomId('roblox_username')
-                .setLabel('Roblox Username')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('اكتب اسم اللاعب')
-                .setRequired(true)
-                .setMaxLength(50);
-
-            const displayNameInput = new TextInputBuilder()
-                .setCustomId('display_name')
-                .setLabel('Display Name')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('الاسم الظاهر')
-                .setRequired(false)
-                .setMaxLength(50);
-
-            const detailsInput = new TextInputBuilder()
-                .setCustomId('report_details')
-                .setLabel('تفاصيل الفضيحه')
-                .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('اشرح وش سوى...')
-                .setRequired(true)
-                .setMaxLength(1000);
-
-            const evidenceInput = new TextInputBuilder()
-                .setCustomId('evidence')
-                .setLabel('رابط صورة او فيديو (اختياري)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://...')
-                .setRequired(false)
-                .setMaxLength(500);
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(robloxUserInput),
-                new ActionRowBuilder().addComponents(displayNameInput),
-                new ActionRowBuilder().addComponents(detailsInput),
-                new ActionRowBuilder().addComponents(evidenceInput)
-            );
-
-            await interaction.showModal(modal);
-        }
-
-        // ========== فضائح: استلام معلومات ==========
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('report_info_')) {
-            const gameValue = interaction.customId.replace('report_info_', '');
-            const game = GAMES.find(g => g.value === gameValue);
-            
-            const robloxUser = interaction.fields.getTextInputValue('roblox_username');
-            const displayName = interaction.fields.getTextInputValue('display_name') || 'غير محدد';
-            const details = interaction.fields.getTextInputValue('report_details');
-            
-            let evidence = interaction.fields.getTextInputValue('evidence');
-            if (!evidence || evidence.trim() === '') {
-                evidence = 'مافيه رابط';
-            }
-
-            client.reports.set(interaction.user.id, {
-                reporter: interaction.user.id,
-                reporterTag: interaction.user.tag,
-                game: game.name,
-                robloxUser,
-                displayName,
-                details,
-                evidence
-            });
-
-            const typeSelect = new StringSelectMenuBuilder()
-                .setCustomId('select_report_type')
-                .setPlaceholder('اختر نوع المخالفة...')
-                .addOptions(REPORT_TYPES.map(t => new StringSelectMenuOptionBuilder()
-                    .setLabel(t.name)
-                    .setValue(t.value)
-                ));
-
-            await interaction.reply({
-                embeds: [new EmbedBuilder()
-                    .setColor('#ff0000')
-                    .setTitle('فضيحه - اختر نوع المخالفة')
-                    .setDescription(`الشخص: ${robloxUser}\nاللعبة: ${game.name}`)
-                ],
-                components: [new ActionRowBuilder().addComponents(typeSelect)],
-                ephemeral: true
-            });
-        }
-
-        // ========== فضائح: اختيار نوع المخالفة ==========
-        if (interaction.isStringSelectMenu() && interaction.customId === 'select_report_type') {
-            const selectedType = REPORT_TYPES.find(t => t.value === interaction.values[0]);
-            const temp = client.reports.get(interaction.user.id);
-            
-            if (!temp) {
-                return interaction.reply({ 
-                    content: 'انتهت الجلسه! اكتب !فضيحه', 
-                    ephemeral: true 
-                });
-            }
-
-            const reportId = client.reportCounter++;
-            const final = { 
-                id: reportId, 
-                ...temp, 
-                type: selectedType.name, 
-                status: 'قيد المراجعه', 
-                timestamp: Date.now() 
-            };
-            
-            client.reports.set(`report_${reportId}`, final);
-            client.reports.delete(interaction.user.id);
-
-            const embed = new EmbedBuilder()
-                .setColor('#ff0000')
-                .setTitle(`فضيحه #${reportId}`)
-                .addFields(
-                    { name: 'اللعبه', value: final.game, inline: true },
-                    { name: 'نوع المخالفه', value: final.type, inline: true },
-                    { name: 'الحاله', value: final.status, inline: true },
-                    { name: 'المبلغ عنه', value: final.robloxUser, inline: false },
-                    { name: 'الاسم الظاهر', value: final.displayName, inline: true },
-                    { name: 'التفاصيل', value: final.details, inline: false }
-                )
-                .setFooter({ text: `مقدم البلاغ: ${final.reporterTag}` })
-                .setTimestamp();
-
-            if (final.evidence !== 'مافيه رابط') {
-                embed.addFields({ 
-                    name: 'الدليل', 
-                    value: `[اضغط هنا](${final.evidence})`, 
-                    inline: false 
-                });
-            } else {
-                embed.addFields({ 
-                    name: 'الدليل', 
-                    value: 'مافيه رابط', 
-                    inline: false 
-                });
-            }
-
-            const buttons = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`accept_${reportId}`).setLabel('قبول').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`reject_${reportId}`).setLabel('رفض').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId(`investigate_${reportId}`).setLabel('تحقيق').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`ban_${reportId}`).setLabel('حظر').setStyle(ButtonStyle.Secondary)
-            );
-
-            const channel = interaction.guild.channels.cache.find(
-                ch => ch.name.includes('فضائح') || ch.name.includes('بلاغات') || ch.name.includes('reports')
-            );
-
-            if (channel) {
-                let messageContent = `فضيحه جديده من <@${final.reporter}>`;
-                
-                if (final.evidence !== 'مافيه رابط') {
-                    messageContent += `\n\n**رابط الفيديو:**\n${final.evidence}`;
-                }
-
-                await channel.send({
-                    content: messageContent,
-                    embeds: [embed],
-                    components: [buttons]
-                });
-            }
-
-            await interaction.update({
-                embeds: [new EmbedBuilder()
-                    .setColor('#00ff00')
-                    .setTitle('تم ارسال الفضيحه')
-                    .setDescription(`رقم الفضيحه: ${reportId}`)
-                    .addFields(
-                        { name: 'اللعبه', value: final.game, inline: true },
-                        { name: 'المخالفه', value: final.type, inline: true }
-                    )
-                ],
-                components: []
-            });
-        }
-
-        // ========== فضائح: أزرار الإدارة ==========
-        if (interaction.isButton() && ['accept', 'reject', 'investigate', 'ban'].includes(interaction.customId.split('_')[0])) {
-            const [action, reportId] = interaction.customId.split('_');
-            const report = client.reports.get(`report_${reportId}`);
-            
-            if (!report) {
-                return interaction.reply({ content: 'الفضيحه غير موجوده!', ephemeral: true });
-            }
-
-            const reporter = await interaction.guild.members.fetch(report.reporter).catch(() => null);
-
-            if (action === 'accept') {
-                report.status = 'مقبول';
-                await interaction.update({ components: [] });
-                await interaction.message.reply(`تم قبول الفضيحه #${reportId} بواسطه ${interaction.user}`);
-                if (reporter) await reporter.send(`فضيحتك #${reportId} تم قبولها!`).catch(() => {});
-            }
-            
-            if (action === 'reject') {
-                report.status = 'مرفوض';
-                await interaction.update({ components: [] });
-                await interaction.message.reply(`تم رفض الفضيحه #${reportId} بواسطه ${interaction.user}`);
-                if (reporter) await reporter.send(`فضيحتك #${reportId} تم رفضها.`).catch(() => {});
-            }
-            
-            if (action === 'investigate') {
-                report.status = 'قيد التحقيق';
-                await interaction.message.reply(`${interaction.user} يحقق في الفضيحه #${reportId}...`);
-            }
-            
-            if (action === 'ban') {
-                report.status = 'محظور';
-                await interaction.message.reply(`تم حظر ${report.robloxUser} بواسطه ${interaction.user}`);
-                if (reporter) await reporter.send(`${report.robloxUser} تم حظره بسبب فضيحتك #${reportId}!`).catch(() => {});
-            }
-        }
-
-        // ========== تكت: فتح تكت ==========
-        if (interaction.isButton() && interaction.customId === 'open_ticket') {
-            const existingTicket = Array.from(client.tickets.values()).find(t => 
-                t.userId === interaction.user.id && t.status === 'open'
-            );
-            
-            if (existingTicket) {
-                return interaction.reply({ 
-                    content: `عندك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`, 
-                    ephemeral: true 
-                });
-            }
-
-            const ticketId = client.ticketCounter++;
-            const ticketName = `تكت-${ticketId}`;
-
-            const channel = await interaction.guild.channels.create({
-                name: ticketName,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    {
-                        id: interaction.guild.id,
-                        deny: [PermissionFlagsBits.ViewChannel]
-                    },
-                    {
-                        id: interaction.user.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
-                    }
-                ]
-            });
-
-            const adminRoles = interaction.guild.roles.cache.filter(r => 
-                r.name.includes('اداره') || 
-                r.name.includes('admin') || 
-                r.name.includes('مشرف') ||
-                r.permissions.has(PermissionFlagsBits.Administrator)
-            );
-
-            for (const [, role] of adminRoles) {
-                await channel.permissionOverwrites.create(role, {
-                    ViewChannel: true,
-                    SendMessages: true,
-                    ReadMessageHistory: true
-                });
-            }
-
-            const ticket = {
-                id: ticketId,
-                userId: interaction.user.id,
-                userTag: interaction.user.tag,
-                channelId: channel.id,
-                status: 'open',
-                claimedBy: null,
-                claimedByTag: null
-            };
-
-            client.tickets.set(ticketId, ticket);
-
-            const welcomeEmbed = new EmbedBuilder()
-                .setColor('#00ff00')
-                .setTitle(`تكت #${ticketId}`)
-                .setDescription('هذا مكان تتكلم فيه مع الاداره')
-                .addFields(
-                    { name: 'تنبيه', value: 'لو تسبب ازعاج او قله ادب = تايم اوت يوم' },
-                    { name: 'فايدة التكت', value: 'التواصل مع الاداره بخصوص اي مشكلة' }
-                )
-                .setFooter({ text: `فتحه: ${interaction.user.tag}` });
-
-            const buttons = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`claim_ticket_${ticketId}`)
-                    .setLabel('استلام تكت')
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(`close_ticket_${ticketId}`)
-                    .setLabel('اقفال تكت')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`abandon_ticket_${ticketId}`)
-                    .setLabel('تخلي عن تكت')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-
-            await channel.send({
-                content: `${interaction.user} تم فتح تكتك`,
-                embeds: [welcomeEmbed],
-                components: [buttons]
-            });
-
-            await interaction.reply({
-                content: `تم فتح تكتك: ${channel}`,
-                ephemeral: true
-            });
-        }
-
-        // ========== تكت: استلام ==========
-        if (interaction.isButton() && interaction.customId.startsWith('claim_ticket_')) {
-            const ticketId = parseInt(interaction.customId.replace('claim_ticket_', ''));
-            const ticket = client.tickets.get(ticketId);
-
-            if (!ticket) {
-                return interaction.reply({ content: 'التكت غير موجود!', ephemeral: true });
-            }
-
-            if (ticket.claimedBy) {
-                return interaction.reply({ 
-                    content: `الاداري <@${ticket.claimedBy}> ماسك التكت بالفعل!`, 
-                    ephemeral: true 
-                });
-            }
-
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && 
-                !interaction.member.roles.cache.some(r => 
-                    r.name.includes('اداره') || r.name.includes('admin') || r.name.includes('مشرف')
-                )) {
-                return interaction.reply({ content: 'هذا للاداره فقط!', ephemeral: true });
-            }
-
-            ticket.claimedBy = interaction.user.id;
-            ticket.claimedByTag = interaction.user.tag;
-
-            await interaction.update({
-                components: [new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`claim_ticket_${ticketId}`)
-                        .setLabel(`ماسكه: ${interaction.user.tag}`)
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(true),
-                    new ButtonBuilder()
-                        .setCustomId(`close_ticket_${ticketId}`)
-                        .setLabel('اقفال تكت')
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`abandon_ticket_${ticketId}`)
-                        .setLabel('تخلي عن تكت')
-                        .setStyle(ButtonStyle.Secondary)
-                )]
-            });
-
-            await interaction.channel.send({
-                content: `الاداري ${interaction.user} استلم التكت`
-            });
-        }
-
-        // ========== تكت: تخلي ==========
-        if (interaction.isButton() && interaction.customId.startsWith('abandon_ticket_')) {
-            const ticketId = parseInt(interaction.customId.replace('abandon_ticket_', ''));
-            const ticket = client.tickets.get(ticketId);
-
-            if (!ticket) {
-                return interaction.reply({ content: 'التكت غير موجود!', ephemeral: true });
-            }
-
-            if (ticket.claimedBy !== interaction.user.id) {
-                return interaction.reply({ content: 'انت ما مستلم التكت!', ephemeral: true });
-            }
-
-            ticket.claimedBy = null;
-            ticket.claimedByTag = null;
-
-            await interaction.update({
-                components: [new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`claim_ticket_${ticketId}`)
-                        .setLabel('استلام تكت')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId(`close_ticket_${ticketId}`)
-                        .setLabel('اقفال تكت')
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`abandon_ticket_${ticketId}`)
-                        .setLabel('تخلي عن تكت')
-                        .setStyle(ButtonStyle.Secondary)
-                )]
-            });
-
-            await interaction.channel.send({
-                content: `الاداري ${interaction.user} تخلى عن التكت`
-            });
-        }
-
-        // ========== تكت: اقفال ==========
-        if (interaction.isButton() && interaction.customId.startsWith('close_ticket_')) {
-            const ticketId = parseInt(interaction.customId.replace('close_ticket_', ''));
-            const ticket = client.tickets.get(ticketId);
-
-            if (!ticket) {
-                return interaction.reply({ content: 'التكت غير موجود!', ephemeral: true });
-            }
-
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && 
-                !interaction.member.roles.cache.some(r => 
-                    r.name.includes('اداره') || r.name.includes('admin') || r.name.includes('مشرف')
-                )) {
-                return interaction.reply({ content: 'هذا للاداره فقط!', ephemeral: true });
-            }
-
-            const modal = new ModalBuilder()
-                .setCustomId(`close_reason_${ticketId}`)
-                .setTitle('اقفال تكت');
-
-            const reasonInput = new TextInputBuilder()
-                .setCustomId('close_reason')
-                .setLabel('سبب الاقفال')
-                .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('اكتب سبب الاقفال...')
-                .setRequired(true)
-                .setMaxLength(500);
-
-            const solvedInput = new TextInputBuilder()
-                .setCustomId('is_solved')
-                .setLabel('هل تم حل التكت؟')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('اكتب: نعم او لا')
-                .setRequired(true)
-                .setMaxLength(10);
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(reasonInput),
-                new ActionRowBuilder().addComponents(solvedInput)
-            );
-
-            await interaction.showModal(modal);
-        }
-
-        // ========== تكت: سبب الاقفال ==========
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('close_reason_')) {
-            const ticketId = parseInt(interaction.customId.replace('close_reason_', ''));
-            const ticket = client.tickets.get(ticketId);
-
-            const reason = interaction.fields.getTextInputValue('close_reason');
-            const isSolved = interaction.fields.getTextInputValue('is_solved');
-
-            ticket.status = 'closed';
-            ticket.closeReason = reason;
-            ticket.isSolved = isSolved;
-            ticket.closedBy = interaction.user.tag;
-
-            const closeEmbed = new EmbedBuilder()
-                .setColor('#ff0000')
-                .setTitle(`تكت #${ticketId} - مقفل`)
-                .addFields(
-                    { name: 'مقفل بواسطة', value: interaction.user.tag, inline: true },
-                    { name: 'سبب الاقفال', value: reason, inline: false },
-                    { name: 'تم الحل؟', value: isSolved, inline: true }
-                )
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [closeEmbed] });
-
-            const user = await client.users.fetch(ticket.userId).catch(() => null);
-            if (user) {
-                const ratingRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`rate_1_${ticketId}`).setLabel('⭐').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`rate_2_${ticketId}`).setLabel('⭐⭐').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`rate_3_${ticketId}`).setLabel('⭐⭐⭐').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`rate_4_${ticketId}`).setLabel('⭐⭐⭐⭐').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId(`rate_5_${ticketId}`).setLabel('⭐⭐⭐⭐⭐').setStyle(ButtonStyle.Primary)
-                );
-
-                await user.send({
-                    content: 'كيف كان التكت؟ قيم التجربة:',
-                    components: [ratingRow]
-                }).catch(() => {
-                    interaction.channel.send('ما قدرت ارسل التقييم للمستخدم');
-                });
-            }
-
-            setTimeout(async () => {
-                const channel = interaction.guild.channels.cache.get(ticket.channelId);
-                if (channel) await channel.delete('تكت مقفل').catch(() => {});
-            }, 5000);
-        }
-
-        // ========== تكت: تقييم ==========
-        if (interaction.isButton() && interaction.customId.startsWith('rate_')) {
-            const [, stars, ticketId] = interaction.customId.split('_');
-            
-            await interaction.update({
-                content: `شكراً لتقييمك! ${'⭐'.repeat(parseInt(stars))}`,
-                components: []
-            });
-
-            const ticket = client.tickets.get(parseInt(ticketId));
-            if (ticket) {
-                ticket.rating = stars;
-            }
-        }
-
-    } catch (error) {
-        console.error('Error:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'حصل خطأ!', ephemeral: true }).catch(() => {});
-        }
+// حماية الريد (دخول أعضاء كثير)
+const joinMap = new Map();
+
+client.on('guildMemberAdd', (member) => {
+  const guildId = member.guild.id;
+  
+  // القائمة السوداء
+  if (client.blacklist.has(member.id)) {
+    member.kick('القائمة السوداء').catch(() => {});
+    return;
+  }
+  
+  // حماية الريد
+  if (client.antiraid.get(guildId)) {
+    const now = Date.now();
+    if (!joinMap.has(guildId)) joinMap.set(guildId, []);
+    
+    const joins = joinMap.get(guildId).filter(t => now - t < 10000);
+    joins.push(now);
+    joinMap.set(guildId, joins);
+    
+    if (joins.length > 5) {
+      member.kick('حماية الريد').catch(() => {});
+      sendLog(member.guild, '🚨 ريد مكتشف', `تم طرد ${member.user.tag} بسبب الريد`, 0xFF0000);
     }
+  }
 });
 
-// دوال التحكم
-client.loginWithToken = async (token) => {
-    try {
-        if (client.isLoggedIn) {
-            return { success: true, message: 'البوت شغال' };
-        }
-        await client.login(token);
-        return { success: true, message: 'تم التشغيل' };
-    } catch (error) {
-        console.error('Login error:', error);
-        return { success: false, message: 'توكن غلط' };
-    }
-};
+// حماية النوك (تغييرات خطيرة)
+client.on('channelDelete', (channel) => {
+  if (!channel.guild) return;
+  if (!client.antinuke.get(channel.guild.id)) return;
+  
+  const audit = channel.guild.fetchAuditLogs({ type: 12, limit: 1 }).then(audit => {
+    const entry = audit.entries.first();
+    if (!entry) return;
+    
+    const executor = channel.guild.members.cache.get(entry.executor.id);
+    if (!executor || isTrusted(executor)) return;
+    
+    punish(executor, 'حذف روم - حماية النوك', 'ban');
+    
+    // استرجاع الروم
+    channel.guild.channels.create({
+      name: channel.name,
+      type: channel.type,
+      parent: channel.parentId,
+      position: channel.position,
+      permissionOverwrites: channel.permissionOverwrites.cache.map(p => ({
+        id: p.id,
+        allow: p.allow,
+        deny: p.deny
+      }))
+    }).catch(() => {});
+  }).catch(() => {});
+});
 
-client.logoutBot = async () => {
-    try {
-        if (!client.isLoggedIn) {
-            return { success: false, message: 'البوت مو شغال' };
-        }
-        await client.destroy();
-        client.isLoggedIn = false;
-        return { success: true, message: 'تم الايقاف' };
-    } catch (error) {
-        return { success: false, message: 'خطأ' };
-    }
-};
+client.on('roleDelete', (role) => {
+  if (!role.guild) return;
+  if (!client.antinuke.get(role.guild.id)) return;
+  
+  role.guild.fetchAuditLogs({ type: 32, limit: 1 }).then(audit => {
+    const entry = audit.entries.first();
+    if (!entry) return;
+    
+    const executor = role.guild.members.cache.get(entry.executor.id);
+    if (!executor || isTrusted(executor)) return;
+    
+    punish(executor, 'حذف رتبة - حماية النوك', 'ban');
+  }).catch(() => {});
+});
 
-client.getBotStatus = () => {
-    return {
-        isRunning: client.isLoggedIn && client.user ? true : false,
-        ping: client.ws?.ping || 0,
-        guilds: client.guilds?.cache?.size || 0,
-        users: client.users?.cache?.size || 0,
-        commands: client.commands?.size || 0
-    };
-};
+client.on('guildMemberRemove', (member) => {
+  if (!client.antinuke.get(member.guild.id)) return;
+  
+  member.guild.fetchAuditLogs({ type: 20, limit: 1 }).then(audit => {
+    const entry = audit.entries.first();
+    if (!entry) return;
+    
+    const executor = member.guild.members.cache.get(entry.executor.id);
+    if (!executor || isTrusted(executor)) return;
+    
+    punish(executor, 'طرد عضو - حماية النوك', 'ban');
+  }).catch(() => {});
+});
 
-client.getBotCommands = () => {
-    return Array.from(client.commands.values()).map(cmd => ({
-        name: cmd.name,
-        description: cmd.description || 'No description',
-        category: cmd.category || 'General',
-        usage: cmd.usage || `!${cmd.name}`
-    }));
-};
+// ===== تشغيل =====
 
-// دالة say للـ TTS
-client.sayText = async (text, voiceChannel, message) => {
-    try {
-        if (text.length > 200) {
-            return { success: false, message: 'الكلام طويل! (الحد 200 حرف)' };
-        }
+client.once('clientReady', () => {
+  console.log(`🛡️ بوت الحماية شغال: ${client.user.tag}`);
+  console.log(`📊 في ${client.guilds.cache.size} سيرفر`);
+  console.log(`🔧 ${client.commands.size} امر`);
+});
 
-        const url = googleTTS.getAudioUrl(text, {
-            lang: 'ar',
-            slow: false,
-            host: 'https://translate.google.com',
-        });
-
-        let connection = getVoiceConnection(voiceChannel.guild.id);
-        if (!connection) {
-            connection = joinVoiceChannel({
-                channelId: voiceChannel.id,
-                guildId: voiceChannel.guild.id,
-                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-            });
-        }
-
-        const player = createAudioPlayer();
-        connection.subscribe(player);
-
-        const resource = createAudioResource(url, {
-            inputType: StreamType.Arbitrary
-        });
-        player.play(resource);
-
-        player.once('idle', () => {});
-        player.on('error', (error) => {
-            console.error('TTS error:', error);
-        });
-
-        return { success: true, message: `قاعد اقول: "${text}"` };
-    } catch (error) {
-        console.error('Say error:', error);
-        return { success: false, message: 'خطأ في التشغيل!' };
-    }
-};
-
-console.log('Waiting for token...');
-
-module.exports = client;
+client.login(process.env.DISCORD_TOKEN);
+process.stdin.resume();
