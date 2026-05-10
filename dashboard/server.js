@@ -4,7 +4,13 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static('public'));
-
+// بعد:
+let bot = null;
+try {
+  bot = require('../bot');
+} catch (e) {
+  console.log('Bot not started yet');
+}
 // متغير التوكن (مؤقت)
 let botToken = null;
 let botClient = null;
