@@ -1,95 +1,55 @@
+// dashboard/server.js
 const express = require('express');
-const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// تحميل البوت
-const client = require('../bot/index');
-
-// Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
-// CORS للـ frontend
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
+// متغير التوكن (مؤقت)
+let botToken = null;
+let botClient = null;
+
+// تشغيل البوت
+app.post('/api/start-bot', (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token required' });
+  
+  botToken = token;
+  
+  // تشغيل البوت هنا
+  const { Client, GatewayIntentBits } = require('discord.js');
+  botClient = new Client({ intents: [GatewayIntentBits.Guilds] });
+  
+  botClient.once('ready', () => {
+    console.log(`Bot started: ${botClient.user.tag}`);
+  });
+  
+  botClient.login(token).catch(err => {
+    return res.status(400).json({ error: 'Invalid token' });
+  });
+  
+  res.json({ success: true, message: 'Bot started' });
 });
 
-// ========== API Routes ==========
-
-app.get('/api/status', (req, res) => {
-    try {
-        res.json(client.getBotStatus());
-    } catch (err) {
-        res.json({ isRunning: false, ping: 0, guilds: 0, users: 0, commands: 0 });
-    }
+// إيقاف البوت
+app.post('/api/stop-bot', (req, res) => {
+  if (botClient) {
+    botClient.destroy();
+    botClient = null;
+    botToken = null;
+  }
+  res.json({ success: true });
 });
 
-app.get('/api/commands', (req, res) => {
-    try {
-        res.json(client.getBotCommands());
-    } catch (err) {
-        res.json([]);
-    }
+// حالة البوت
+app.get('/api/bot-status', (req, res) => {
+  res.json({ 
+    running: !!botClient,
+    user: botClient?.user?.tag || null
+  });
 });
 
-app.post('/api/start', async (req, res) => {
-    try {
-        const { token } = req.body;
-        if (!token) {
-            return res.status(400).json({ success: false, message: '❌ التوكن فارغ!' });
-        }
-        const result = await client.loginWithToken(token);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ success: false, message: '❌ خطأ: ' + error.message });
-    }
-});
-
-app.post('/api/stop', async (req, res) => {
-    try {
-        const result = await client.logoutBot();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ success: false, message: '❌ خطأ: ' + error.message });
-    }
-});
-
-// Music API (placeholder)
-app.post('/api/music/play', (req, res) => {
-    res.json({ success: true, message: 'Use !play in Discord' });
-});
-
-app.post('/api/music/stop', (req, res) => {
-    res.json({ success: true, message: 'Use !stop in Discord' });
-});
-
-app.post('/api/music/skip', (req, res) => {
-    res.json({ success: true, message: 'Use !skip in Discord' });
-});
-
-app.get('/api/music/queue', (req, res) => {
-    res.json({ queue: [] });
-});
-
-// صفحة رئيسية
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// معالجة الأخطاء
-app.use((err, req, res, next) => {
-    console.error('Express error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 Dashboard running on port ${PORT}`);
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Dashboard running on port ${PORT}`);
 });
