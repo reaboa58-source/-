@@ -611,5 +611,10 @@ client.once('clientReady', () => {
   console.log(`🔧 ${client.commands.size} امر`);
 });
 
-client.login(process.env.DISCORD_TOKEN);
+if (!config.token || config.token === 'YOUR_TOKEN_HERE') {
+  console.log('⚠️ No token. Bot disabled.');
+  module.exports = null;
+} else {
+  client.login(config.token);
+}
 process.stdin.resume();
