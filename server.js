@@ -34,6 +34,209 @@ wss.on('connection', (ws) => {
   logs.forEach(log => ws.send(JSON.stringify({ type: 'log', message: log })));
 });
 
+// ========== نظام القوانين التلقائي ==========
+
+const badWords = {
+  'قذف_اهل': [
+    'كس اخت', 'كس ام', 'كس ابو', 'كس اخو', 'كس اختك', 'كس امك', 'كس ابوك', 'كس اخوك',
+    'اختك', 'امك', 'ابوك', 'اخوك', 'عرص', 'قحبة', 'شرموطة', 'منيوك', 'زبي', 'طيز',
+    'كس', 'نيك', 'مص', 'لحس', 'قحب', 'شرموط', 'منيك', 'خول', 'لوطي', 'سافل'
+  ],
+  'سب': [
+    'يا كلب', 'يا حيوان', 'يا جحش', 'يا حمار', 'يا تيس', 'يا بقر', 'يا جلب',
+    'يا واطي', 'يا سافل', 'يا حقير', 'يا ديوث', 'يا خنيث', 'يا عرص',
+    'غبي', 'احمق', 'معتوه', 'مجنون', 'فاشل', 'تافه', 'حقير'
+  ],
+  'تنمر': [
+    'اسود', 'عبد', 'هندي', 'بنجالي', 'فلسطيني', 'سوري', 'مصري', 'مغربي',
+    'زنجي', 'عجمي', 'بدو', 'صحراوي', 'فقير', 'مسكين', 'معاق', 'اعمى', 'اصم'
+  ],
+  'اخلاقي': [
+    'جنس', 'سكس', 'porn', 'sex', 'xxx', 'نيك', 'مص', 'لحس', 'قحبة', 'شرموطة',
+    'masturbation', 'masturbate', 'pornhub', 'xnxx', 'xvideos'
+  ],
+  'سياسي': [
+    'اسرائيل', 'يهود', 'صهيون', 'حمس', 'فتح', 'داعش', 'القاعدة', 'طالبان',
+    'ايران', 'السعودية', 'الامارات', 'قطر', 'تركيا', 'امريكا', 'روسيا',
+    'حزب الله', 'الحوثي', 'الاخوان', 'صهيوني', 'صهيونية'
+  ],
+  'مشاكل': [
+    'تعال خاص', 'تعال فويس', 'برا السيرفر', 'حوار برا', 'تعال برا',
+    'بنحلها برا', 'برا', 'تعال نتقاتل', 'تعال نتهاوش'
+  ],
+  'اسلوب_سيء': [
+    'اسكت', 'اخرس', 'سكوت', 'بلع', 'خرس', 'سد حلقك', 'سد فمك',
+    'ما يهمك', 'ما يخصك', 'انقلع', 'اطلع', 'روح', 'غور'
+  ]
+};
+
+const rulePunishments = {
+  'قذف_اهل': { type: 'timeout', duration: 2 * 60 * 60 * 1000, reason: 'قذف الأهل - 2 ساعة' },
+  'سب': { type: 'timeout', duration: 1 * 60 * 60 * 1000, reason: 'السب - 1 ساعة' },
+  'تنمر': { type: 'timeout', duration: 30 * 60 * 1000, reason: 'تنمر/عنصرية - 30 دقيقة' },
+  'اخلاقي': { type: 'timeout', duration: 20 * 60 * 1000, reason: 'مواضيع اخلاقية - 20 دقيقة' },
+  'سياسي': { type: 'timeout', duration: 10 * 60 * 1000, reason: 'مواضيع سياسية - 10 دقائق' },
+  'مشاكل': { type: 'timeout', duration: 10 * 60 * 1000, reason: 'افتعال مشاكل - 10 دقائق' },
+  'اسلوب_سيء': { type: 'warn', reason: 'اسلوب سيء - تحذير' }
+};
+
+const adminViolations = new Map();
+
+function checkBadWords(message) {
+  if (message.author.bot || !message.guild) return;
+  
+  const content = message.content.toLowerCase();
+  const member = message.member;
+  
+  for (const [category, words] of Object.entries(badWords)) {
+    const found = words.some(word => content.includes(word.toLowerCase()));
+    if (!found) continue;
+    
+    const punishment = rulePunishments[category];
+    if (!punishment) continue;
+    
+    applyPunishment(message, member, punishment, category);
+    message.delete().catch(() => {});
+    addLog(`🚨 ${message.author.tag} | ${punishment.reason} | "${message.content.substring(0, 50)}..."`);
+    
+    break;
+  }
+}
+
+async function applyPunishment(message, member, punishment, category) {
+  const guild = message.guild;
+  
+  if (member.permissions.has(PermissionFlagsBits.ManageMessages) || 
+      member.permissions.has(PermissionFlagsBits.KickMembers) ||
+      member.permissions.has(PermissionFlagsBits.Administrator)) {
+    
+    const adminServerRules = {
+      'قذف_اهل': { type: 'timeout', duration: 2 * 60 * 60 * 1000, reason: 'قذف الأهل (إداري) - 2 ساعة' },
+      'سب': { type: 'timeout', duration: 1 * 60 * 60 * 1000, reason: 'السب (إداري) - 1 ساعة' },
+      'تنمر': { type: 'timeout', duration: 30 * 60 * 1000, reason: 'تنمر/عنصرية (إداري) - 30 دقيقة' },
+      'اخلاقي': { type: 'timeout', duration: 20 * 60 * 1000, reason: 'مواضيع اخلاقية (إداري) - 20 دقيقة' },
+      'سياسي': { type: 'timeout', duration: 10 * 60 * 1000, reason: 'سياسة (إداري) - 10 دقائق' },
+      'مشاكل': { type: 'timeout', duration: 10 * 60 * 1000, reason: 'مشاكل (إداري) - 10 دقائق' },
+      'اسلوب_سيء': { type: 'warn', reason: 'اسلوب سيء (إداري) - تحذير' }
+    };
+    
+    const isMap = message.channel.name.toLowerCase().includes('map') || 
+                  message.channel.name.toLowerCase().includes('ماب') ||
+                  message.channel.parent?.name.toLowerCase().includes('map');
+    
+    if (isMap) {
+      const mapRules = {
+        'قذف_اهل': { type: 'timeout', duration: 5 * 60 * 60 * 1000, reason: 'قذف في الماب - 5 ساعات' },
+        'سب': { type: 'timeout', duration: 1 * 60 * 60 * 1000, reason: 'سب في الماب - 1 ساعة' },
+        'تنمر': { type: 'timeout', duration: 30 * 60 * 1000, reason: 'تنمر في الماب - 30 دقيقة' },
+        'اخلاقي': { type: 'timeout', duration: 1 * 24 * 60 * 60 * 1000, reason: 'لوك/سايلنت في الماب - يوم' },
+        'سياسي': { type: 'timeout', duration: 2 * 24 * 60 * 60 * 1000, reason: 'هاك في الماب - يومين' },
+        'مشاكل': { type: 'timeout', duration: 3 * 24 * 60 * 60 * 1000, reason: 'هاك تكرار - 3 أيام' },
+        'اسلوب_سيء': { type: 'warn', reason: 'اسلوب سيء في الماب - تحذير' }
+      };
+      
+      const mapPunishment = mapRules[category];
+      if (mapPunishment) {
+        await executePunishment(member, mapPunishment, message);
+        return;
+      }
+    }
+    
+    const adminPunishment = adminServerRules[category];
+    if (adminPunishment) {
+      await executePunishment(member, adminPunishment, message);
+    }
+    
+    return;
+  }
+  
+  await executePunishment(member, punishment, message);
+}
+
+async function executePunishment(member, punishment, message) {
+  try {
+    if (punishment.type === 'timeout') {
+      await member.timeout(punishment.duration, punishment.reason);
+      
+      member.send({
+        embeds: [{
+          color: 0xFF0000,
+          title: '⚠️ تم تطبيق عقوبة',
+          description: `**السبب:** ${punishment.reason}\n**المدة:** ${formatDuration(punishment.duration)}\n**الروم:** ${message.channel.name}`,
+          footer: { text: 'يرجى الالتزام بقوانين السيرفر' }
+        }]
+      }).catch(() => {});
+      
+    } else if (punishment.type === 'warn') {
+      const key = `${message.guild.id}-${member.id}-${punishment.reason}`;
+      const count = (adminViolations.get(key) || 0) + 1;
+      adminViolations.set(key, count);
+      
+      const warnLimits = {
+        'اسلوب سيء - تحذير': 3,
+        'السب - 1 ساعة': 2,
+        'قذف الأهل - 2 ساعة': 2,
+        'تنمر/عنصرية - 30 دقيقة': 2,
+        'افتعال مشاكل - 10 دقائق': 2
+      };
+      
+      const limit = warnLimits[punishment.reason] || 3;
+      
+      if (count >= limit) {
+        const warnKey = `${message.guild.id}-${member.id}`;
+        if (!bot.warnings.has(warnKey)) bot.warnings.set(warnKey, []);
+        bot.warnings.get(warnKey).push({ 
+          reason: `${punishment.reason} (تكرار ${count} مرات)`, 
+          by: bot.user.id, 
+          date: new Date() 
+        });
+        
+        member.send({
+          embeds: [{
+            color: 0xFFA500,
+            title: '⚠️ تحذير رسمي',
+            description: `تم إنذارك بسبب: ${punishment.reason}\n**عدد المرات:** ${count}\n**الإنذارات:** ${bot.warnings.get(warnKey).length}/3`,
+            footer: { text: '3 إنذارات = طرد تلقائي' }
+          }]
+        }).catch(() => {});
+        
+        if (bot.warnings.get(warnKey).length >= 3) {
+          await member.kick('3 إنذارات - طرد تلقائي').catch(() => {});
+          addLog(`🚫 ${member.user.tag} طرد تلقائي - 3 إنذارات`);
+        }
+        
+        adminViolations.delete(key);
+      } else {
+        member.send({
+          embeds: [{
+            color: 0xFFA500,
+            title: '⚠️ تنبيه',
+            description: `**${punishment.reason}**\n**التكرار:** ${count}/${limit}\n**انتبه:** التكرار يؤدي لإنذار رسمي!`
+          }]
+        }).catch(() => {});
+      }
+    }
+    
+    const alertMsg = await message.channel.send({
+      embeds: [{
+        color: 0xFF0000,
+        description: `🚨 ${member} | ${punishment.reason}`
+      }]
+    });
+    setTimeout(() => alertMsg.delete().catch(() => {}), 5000);
+    
+  } catch (err) {
+    addLog(`❌ فشل العقوبة: ${err.message}`);
+  }
+}
+
+function formatDuration(ms) {
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours} ساعة ${minutes} دقيقة`;
+  return `${minutes} دقيقة`;
+}
+
 // ========== BOT FUNCTIONS ==========
 
 function isAdmin(member) {
@@ -1002,6 +1205,9 @@ function setupEvents() {
   const voiceJoinTimes = new Map();
 
   bot.on('messageCreate', (message) => {
+    // ========== نظام القوانين التلقائي ==========
+    checkBadWords(message);
+    
     if (message.author.bot || !message.guild) return;
     
     // منشن رتبة = يعطي الرتبة
@@ -1016,563 +1222,4 @@ function setupEvents() {
       if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
         return message.reply('البوت ما عنده صلاحية Manage Roles!');
       }
-      if (mentionedRole.position >= botMember.roles.highest.position) {
-        return message.reply('الرتبة أعلى من رتبة البوت!');
-      }
-      mentionedMember.roles.add(mentionedRole).then(() => {
-        message.reply(`تم إعطاء ${mentionedMember.user.username} رتبة ${mentionedRole.name}`);
-        sendLog(message.guild, 'role_add', { 
-          targetId: mentionedMember.id, 
-          roleId: mentionedRole.id, 
-          modId: message.author.id 
-        });
-      }).catch(() => message.reply('ما قدرت أعطي الرتبة!'));
-      return;
-    }
-    
-    // No-prefix aliases
-    const noPrefixAliases = {
-      'ping': 'ping', 'بنق': 'ping', 'p': 'ping',
-      'say': 'say', 'قل': 'say', 's': 'say',
-      'userinfo': 'userinfo', 'معلومات': 'userinfo', 'ui': 'userinfo',
-      'serverinfo': 'serverinfo', 'سيرفر': 'serverinfo', 'si': 'serverinfo',
-      'avatar': 'avatar', 'صورة': 'avatar', 'av': 'avatar',
-      'banner': 'banner', 'بانر': 'banner', 'bn': 'banner',
-      'id': 'id', 'ايدي': 'id', 'i': 'id',
-      'roles': 'roles', 'رتب': 'roles', 'r': 'roles',
-      'botinfo': 'botinfo', 'بوت': 'botinfo', 'bi': 'botinfo',
-      'invite': 'invite', 'دعوة': 'invite', 'inv': 'invite',
-      'rank': 'rank', 'لفل': 'rank', 'لفلي': 'rank', 'rl': 'rank',
-      'leaderboard': 'leaderboard', 'ليدر': 'leaderboard', 'توب': 'leaderboard', 'lb': 'leaderboard',
-      'points': 'points', 'نقاط': 'points', 'نقاطي': 'points', 'pt': 'points',
-      'clear': 'clear', 'مسح': 'clear', 'حذف': 'clear', 'c': 'clear',
-      'kick': 'kick', 'طرد': 'kick', 'k': 'kick',
-      'ban': 'ban', 'قمنقلع': 'ban', 'b': 'ban',
-      'unban': 'unban', 'فك': 'unban', 'ub': 'unban',
-      'mute': 'mute', 'اسكت': 'mute',
-      'unmute': 'unmute', 'تكلم': 'unmute',
-      'warn': 'warn', 'ت': 'warn', 'w': 'warn',
-      'warnings': 'warnings', 'تحذيرات': 'warnings', 'ws': 'warnings',
-      'unwarn': 'unwarn', 'شيل': 'unwarn', 'uw': 'unwarn',
-      'slowmode': 'slowmode', 'بطيء': 'slowmode', 'sm': 'slowmode',
-      'lock': 'lock', 'قفل': 'lock', 'ق': 'lock',
-      'unlock': 'unlock', 'فتح': 'unlock', 'ف': 'unlock',
-      'nick': 'nick', 'لقب': 'nick', 'n': 'nick',
-      'role': 'role', 'رتبة': 'role', 'rol': 'role',
-      'announce': 'announce', 'اعلان': 'announce', 'ann': 'announce',
-      'تكت': 'تكت', 'تذكرة': 'تكت', 'tk': 'تكت',
-      'setwelcome': 'setwelcome', 'روم-ترحيب': 'setwelcome', 'sw': 'setwelcome',
-      'setticket': 'setticket', 'روم-تكت': 'setticket', 'st': 'setticket',
-      'setlevel': 'setlevel', 'روم-لفل': 'setlevel', 'sl': 'setlevel',
-      'setlog': 'setlog', 'روم-لوق': 'setlog', 'log': 'setlog',
-      'sqmr1': 'sqmr1', 'تحقق': 'sqmr1', 'ver': 'sqmr1',
-      'poll': 'poll', 'تصويت': 'poll', 'pl': 'poll',
-      'giveaway': 'giveaway', 'جيف': 'giveaway', 'gv': 'giveaway',
-      'suggest': 'suggest', 'اقتراح': 'suggest', 'sg': 'suggest',
-      'report': 'report', 'ابلاغ': 'report', 'rep': 'report',
-      'remind': 'remind', 'تذكير': 'remind', 'rm': 'remind',
-      'help': 'help', 'مساعدة': 'help', 'h': 'help',
-      'addxp': 'addxp', 'اضافة-لفل': 'addxp', 'axp': 'addxp',
-      'resetxp': 'resetxp', 'تصفير-لفل': 'resetxp', 'rxp': 'resetxp'
-    };
-    
-    const content = message.content.trim();
-    const lowerContent = content.toLowerCase();
-    
-    if (!content.startsWith('!') && noPrefixAliases[lowerContent]) {
-      const commandName = noPrefixAliases[lowerContent];
-      const command = bot.commands.get(commandName);
-      if (command) {
-        try {
-          command.execute(message, []);
-          return;
-        } catch (error) {
-          console.error(error);
-          return message.reply('صار خطأ!');
-        }
-      }
-    }
-    
-    // XP System
-    const xpGain = Math.floor(Math.random() * 10) + 5;
-    const result = addXP(message.author.id, message.guild.id, xpGain);
-    addPoints(message.author.id, message.guild.id, Math.floor(xpGain / 2));
-    
-    if (result.leveledUp && bot.levelChannels.has(message.guild.id)) {
-      const levelChannel = message.guild.channels.cache.get(bot.levelChannels.get(message.guild.id));
-      if (levelChannel) {
-        levelChannel.send({
-          embeds: [{
-            color: 0xFFD700,
-            title: 'لفل جديد!',
-            description: `مبروك ${message.author}! وصلت للفل **${result.newLevel}**`,
-            thumbnail: { url: message.author.displayAvatarURL() },
-            fields: [
-              { name: 'كنت', value: `لفل ${result.oldLevel}`, inline: false },
-              { name: 'صرت', value: `لفل ${result.newLevel}`, inline: false }
-            ]
-          }]
-        });
-      }
-    }
-    
-    if (result.leveledUp) {
-      message.author.send({
-        embeds: [{
-          color: 0xFFD700,
-          title: 'مبروك!',
-          description: `وصلت للفل **${result.newLevel}** في سيرفر **${message.guild.name}**!`
-        }]
-      }).catch(() => {});
-    }
-    
-    if (!message.content.startsWith('!')) return;
-    
-    const args = message.content.slice(1).trim().split(/ +/);
-    let commandName = args.shift().toLowerCase();
-    
-    if (bot.aliases.has(commandName)) {
-      commandName = bot.aliases.get(commandName);
-    }
-    
-    const command = bot.commands.get(commandName);
-    if (!command) return;
-    
-    try {
-      command.execute(message, args);
-    } catch (error) {
-      console.error(error);
-      message.reply('صار خطأ!');
-    }
-  });
-
-  bot.on('messageDelete', async (message) => {
-    if (message.author?.bot || !message.guild) return;
-    sendLog(message.guild, 'message_delete', {
-      author: { id: message.author.id, tag: message.author.tag, avatar: message.author.displayAvatarURL() },
-      channelId: message.channel.id,
-      content: message.content || 'مرفق/امبد'
-    });
-  });
-
-  bot.on('guildMemberAdd', (member) => {
-    sendLog(member.guild, 'member_join', {
-      userId: member.id,
-      tag: member.user.tag,
-      avatar: member.user.displayAvatarURL(),
-      createdAt: member.user.createdTimestamp
-    });
-    
-    if (bot.welcomeChannels.has(member.guild.id)) {
-      const welcomeChannel = member.guild.channels.cache.get(bot.welcomeChannels.get(member.guild.id));
-      if (welcomeChannel) {
-        welcomeChannel.send(`مرحبا ${member}! انضم لسيرفر **${member.guild.name}**`);
-      }
-    }
-  });
-
-  bot.on('guildMemberRemove', (member) => {
-    sendLog(member.guild, 'member_leave', {
-      userId: member.id,
-      tag: member.user.tag,
-      avatar: member.user.displayAvatarURL(),
-      joinedAt: member.joinedTimestamp
-    });
-  });
-
-  bot.on('voiceStateUpdate', (oldState, newState) => {
-    const member = newState.member || oldState.member;
-    if (!member || member.user.bot) return;
-    
-    if (!oldState.channelId && newState.channelId) {
-      voiceJoinTimes.set(`${member.guild.id}-${member.id}`, Date.now());
-      sendLog(member.guild, 'voice_join', {
-        userId: member.id,
-        channelName: newState.channel.name
-      });
-    }
-    
-    if (oldState.channelId && !newState.channelId) {
-      const joinTime = voiceJoinTimes.get(`${member.guild.id}-${member.id}`);
-      const duration = joinTime ? Math.floor((Date.now() - joinTime) / 1000) : null;
-      voiceJoinTimes.delete(`${member.guild.id}-${member.id}`);
-      
-      const key = `${member.guild.id}-${member.id}`;
-      if (bot.levels.has(key)) {
-        const data = bot.levels.get(key);
-        data.voiceTime += duration || 0;
-        bot.levels.set(key, data);
-      }
-      
-      sendLog(member.guild, 'voice_leave', {
-        userId: member.id,
-        channelName: oldState.channel.name,
-        duration: duration
-      });
-    }
-  });
-
-  bot.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
-
-    if (interaction.customId === 'verify_human') {
-      const member = interaction.member;
-      const roleId = '1502800437235945692';
-      
-      if (member.roles.cache.has(roleId)) {
-        return interaction.reply({ content: 'تم التحقق من قبل!', ephemeral: true });
-      }
-
-      await member.roles.add(roleId).catch(() => {
-        return interaction.reply({ content: 'ما قدرت اعطيك الرتبة!', ephemeral: true });
-      });
-
-      await interaction.reply({ content: 'تم التحقق! تم اعطائك الرتبة.', ephemeral: true });
-    }
-
-    if (interaction.customId === 'ticket_type') {
-      const existingTicket = Array.from(bot.tickets.values()).find(t => 
-        t.userId === interaction.user.id && t.status === 'open'
-      );
-      
-      if (existingTicket) {
-        return interaction.reply({ 
-          content: `عندك تكت مفتوح: <#${existingTicket.channelId}>`, 
-          ephemeral: true 
-        });
-      }
-
-      const typeMap = {
-        'inquiry': 'استفسار',
-        'open_ticket': 'Open Ticket',
-        'member_report': 'شكوى-عضو'
-      };
-
-      const ticketType = interaction.values[0];
-      bot.ticketCounter++;
-      const ticketName = `${typeMap[ticketType]}-${bot.ticketCounter}`;
-      const openTime = new Date();
-
-      const channel = await interaction.guild.channels.create({
-        name: ticketName,
-        type: 0,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: [PermissionFlagsBits.ViewChannel]
-          },
-          {
-            id: interaction.user.id,
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
-          }
-        ]
-      });
-
-      const ticketData = {
-        userId: interaction.user.id,
-        channelId: channel.id,
-        status: 'open',
-        type: typeMap[ticketType],
-        createdAt: openTime,
-        closedAt: null,
-        closedBy: null,
-        closeReason: null,
-        duration: null,
-        claimedBy: null
-      };
-
-      bot.tickets.set(channel.id, ticketData);
-
-      const controlRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('rename_ticket').setLabel('تغيير الاسم').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('close_ticket').setLabel('اغلاق').setStyle(ButtonStyle.Danger)
-      );
-
-      const embed = new EmbedBuilder()
-        .setColor(0x0099ff)
-        .setTitle(`تكت ${typeMap[ticketType]}`)
-        .setDescription(`
-مرحبا ${interaction.user}، كيف نقدر نساعدك؟
-
-النوع: ${typeMap[ticketType]}
-رقم التكت: ${bot.ticketCounter}
-تم الفتح: <t:${Math.floor(openTime.getTime() / 1000)}:F>
-        `)
-        .setFooter({ text: `تكت رقم ${bot.ticketCounter}` });
-
-      await channel.send({ embeds: [embed], components: [controlRow] });
-      
-      await sendLog(interaction.guild, 'ticket_open', { 
-        userId: interaction.user.id, 
-        type: typeMap[ticketType],
-        ticketNum: bot.ticketCounter,
-        timestamp: Date.now()
-      });
-      
-      await interaction.reply({ content: `تم فتح تكت: ${channel}`, ephemeral: true });
-    }
-
-    if (interaction.customId === 'claim_ticket') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket || ticket.status !== 'open') return;
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: 'للإدارة فقط!', ephemeral: true });
-      }
-
-      ticket.claimedBy = interaction.user.id;
-      bot.tickets.set(interaction.channel.id, ticket);
-      await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
-        ViewChannel: true, SendMessages: true, ReadMessageHistory: true
-      });
-
-      sendLog(interaction.guild, 'ticket_claim', { channelId: interaction.channel.id, claimedBy: interaction.user.id });
-      await interaction.reply({ embeds: [{ color: 0x00FF00, description: `تم استلام التكت من: ${interaction.user}` }] });
-    }
-
-    if (interaction.customId === 'rename_ticket') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket || ticket.status !== 'open') return;
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: 'للإدارة فقط!', ephemeral: true });
-      }
-
-      const modal = new ModalBuilder()
-        .setCustomId('rename_modal')
-        .setTitle('تغيير اسم التكت')
-        .addComponents(new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId('new_name')
-            .setLabel('الاسم الجديد')
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('مثال: تكت-مساعدة')
-            .setRequired(true)
-            .setMaxLength(100)
-        ));
-
-      await interaction.showModal(modal);
-    }
-
-    if (interaction.customId === 'close_ticket') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket || ticket.status !== 'open') return;
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: 'للإدارة فقط!', ephemeral: true });
-      }
-
-      const selectRow = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('close_reason')
-          .setPlaceholder('اختر سبب الاغلاق')
-          .addOptions(
-            new StringSelectMenuOptionBuilder().setLabel('تم الحل').setValue('solved').setDescription('المشكلة تم حلها'),
-            new StringSelectMenuOptionBuilder().setLabel('مخالفة').setValue('violation').setDescription('مخالفة للقوانين'),
-            new StringSelectMenuOptionBuilder().setLabel('تكرار').setValue('spam').setDescription('تكت مكرر'),
-            new StringSelectMenuOptionBuilder().setLabel('غير نشط').setValue('inactive').setDescription('العضو غير نشط'),
-            new StringSelectMenuOptionBuilder().setLabel('سبب اخر').setValue('other').setDescription('سبب مختلف')
-          )
-      );
-
-      await interaction.reply({
-        embeds: [{ color: 0xFF0000, title: 'اغلاق التكت', description: 'اختر سبب الاغلاق:' }],
-        components: [selectRow]
-      });
-    }
-
-    if (interaction.customId === 'close_reason') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket || ticket.status !== 'open') return;
-
-      const reasonMap = { 'solved': 'تم الحل', 'violation': 'مخالفة', 'spam': 'تكرار', 'inactive': 'غير نشط', 'other': 'سبب اخر' };
-      const closeReason = reasonMap[interaction.values[0]];
-      const closeTime = new Date();
-      const duration = Math.floor((closeTime - ticket.createdAt) / 1000 / 60);
-
-      ticket.status = 'closed';
-      ticket.closedAt = closeTime;
-      ticket.closedBy = interaction.user.id;
-      ticket.closeReason = closeReason;
-      ticket.duration = duration;
-      bot.tickets.set(interaction.channel.id, ticket);
-
-      await sendLog(interaction.guild, 'ticket_close', {
-        userId: ticket.userId,
-        type: ticket.type,
-        ticketNum: bot.ticketCounter,
-        reason: closeReason,
-        closedBy: interaction.user.id,
-        closedByTag: interaction.user.tag,
-        createdAt: ticket.createdAt.getTime(),
-        closedAt: closeTime.getTime(),
-        duration: duration
-      });
-
-      const confirmRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('confirm_close').setLabel('نعم، اغلق').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('cancel_close').setLabel('لا، الغاء').setStyle(ButtonStyle.Secondary)
-      );
-
-      await interaction.update({
-        embeds: [{
-          color: 0xFF0000,
-          title: 'تأكيد الإغلاق',
-          description: `
-العضو: <@${ticket.userId}>
-مفتوح منذ: ${duration} دقيقة
-السبب: ${closeReason}
-          `
-        }],
-        components: [confirmRow]
-      });
-    }
-
-    if (interaction.customId === 'confirm_close') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket) return;
-
-      await interaction.channel.delete().catch(() => {
-        interaction.reply({ content: 'ما قدرت أحذف الروم!', ephemeral: true });
-      });
-    }
-
-    if (interaction.customId === 'cancel_close') {
-      const ticket = bot.tickets.get(interaction.channel.id);
-      if (!ticket) return;
-
-      ticket.status = 'open';
-      ticket.closedAt = null;
-      ticket.closedBy = null;
-      ticket.closeReason = null;
-      ticket.duration = null;
-      bot.tickets.set(interaction.channel.id, ticket);
-
-      await interaction.update({
-        embeds: [{ color: 0x00FF00, title: 'تم إلغاء الإغلاق', description: 'التكت مفتوح مرة ثانية.' }],
-        components: []
-      });
-    }
-
-    if (interaction.isModalSubmit() && interaction.customId === 'rename_modal') {
-      const newName = interaction.fields.getTextInputValue('new_name');
-      await interaction.channel.setName(newName).catch(() => {});
-      await interaction.reply({ content: `تم تغيير الاسم لـ: ${newName}`, ephemeral: true });
-    }
-  });
-}
-
-// ========== DASHBOARD API ==========
-
-// Start bot
-app.post('/api/start', async (req, res) => {
-  const { token } = req.body;
-  
-  if (bot) {
-    return res.json({ success: false, error: 'البوت شغال!' });
-  }
-  
-  if (!token || token.length < 50) {
-    return res.json({ success: false, error: 'توكن غلط!' });
-  }
-  
-  botToken = token;
-  
-  try {
-    bot = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildModeration
-      ]
-    });
-    
-    bot.commands = new Collection();
-    bot.aliases = new Map();
-    bot.tickets = new Map();
-    bot.levels = new Map();
-    bot.points = new Map();
-    bot.warnings = new Map();
-    bot.welcomeChannels = new Map();
-    bot.ticketSettings = new Map();
-    bot.levelChannels = new Map();
-    bot.giveaways = new Map();
-    bot.logChannels = new Map();
-    bot.ticketCounter = 0;
-    bot.giveawayCounter = 0;
-    
-    setupCommands();
-    setupEvents();
-    
-    bot.on('ready', () => {
-      botStatus = 'online';
-      addLog(`✅ ${bot.user.tag} شغال!`);
-      addLog(`📊 ${bot.guilds.cache.size} سيرفر | ${bot.users.cache.size} مستخدم`);
-      broadcastStatus();
-    });
-    
-    bot.on('error', (err) => {
-      addLog(`❌ خطأ: ${err.message}`);
-    });
-    
-    await bot.login(token);
-    res.json({ success: true });
-    
-  } catch (err) {
-    bot = null;
-    botStatus = 'offline';
-    addLog(`❌ فشل التشغيل: ${err.message}`);
-    broadcastStatus();
-    res.json({ success: false, error: err.message });
-  }
-});
-
-// Stop bot
-app.post('/api/stop', async (req, res) => {
-  if (!bot) {
-    return res.json({ success: false, error: 'البوت مو شغال!' });
-  }
-  
-  try {
-    await bot.destroy();
-    bot = null;
-    botStatus = 'offline';
-    addLog('🛑 البوت توقف');
-    broadcastStatus();
-    res.json({ success: true });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  }
-});
-
-// Get status
-app.get('/api/status', (req, res) => {
-  res.json({
-    status: botStatus,
-    tag: bot?.user?.tag || null,
-    guilds: bot?.guilds?.cache?.size || 0,
-    users: bot?.users?.cache?.size || 0,
-    ping: bot?.ws?.ping || 0,
-    uptime: process.uptime()
-  });
-});
-
-// Get logs
-app.get('/api/logs', (req, res) => {
-  res.json(logs);
-});
-
-function broadcastStatus() {
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) {
-      client.send(JSON.stringify({ type: 'status', status: botStatus }));
-    }
-  });
-}
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🌐 Dashboard: http://localhost:${PORT}`);
-});
+      if (mentionedRole.position >= botMember.roles.highest.position
