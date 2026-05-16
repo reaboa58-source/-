@@ -193,7 +193,7 @@ function setupCommands() {
       imageUrl = imgMatch[1];
       description = text.replace(imgMatch[0], '').trim();
     }
-    const embed = new EmbedBuilder().setColor(0x5865F2).setDescription(description).setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() }).setTimestamp();
+    const embed = new EmbedBuilder().setColor(0xFF0000).setDescription(description).setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() }).setTimestamp();
     if (imageUrl) embed.setImage(imageUrl);
     message.channel.send({ embeds: [embed] });
     message.delete().catch(() => {});
@@ -226,7 +226,7 @@ function setupCommands() {
   registerCommand('nick', ['لقب', 'n'], { category: 'ادارة', description: 'تغيير لقب', execute(message, args) { if (!message.member.permissions.has(PermissionFlagsBits.ManageNicknames)) return message.reply('ما عندك صلاحية!'); const target = message.mentions.members.first(); if (!target) return message.reply('منشن العضو!'); target.setNickname(args.slice(1).join(' ') || null).then(() => message.reply('تم تغيير اللقب')).catch(() => message.reply('ما قدرت!')); } });
   registerCommand('role', ['رتبة', 'rol'], { category: 'ادارة', description: 'إعطاء/سحب رتبة', execute(message, args) { if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) return message.reply('ما عندك صلاحية!'); const target = message.mentions.members.first(); const role = message.mentions.roles.first(); if (!target || !role) return message.reply('منشن العضو والرتبة!'); if (target.roles.cache.has(role.id)) { target.roles.remove(role).then(() => message.reply(`تم سحب ${role.name}`)); } else { target.roles.add(role).then(() => message.reply(`تم إعطاء ${role.name}`)); } } });
   registerCommand('announce', ['اعلان', 'ann'], { category: 'ادارة', description: 'إرسال إعلان', execute(message, args) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const channel = message.mentions.channels.first() || message.channel; const text = args.join(' ').replace(/<<#\d+>/, '').trim(); if (!text) return message.reply('اكتب نص الإعلان!'); channel.send({ embeds: [{ color: 0xFF0000, title: 'إعلان', description: text, footer: { text: `بواسطة ${message.author.username}` }, timestamp: new Date() }] }); message.delete().catch(() => {}); } });
-  registerCommand('تكت', ['تذكرة', 'tk'], { category: 'ادارة', description: 'رسالة التكت', execute(message) { if (!isModerator(message.member)) return message.reply('للإدارة فقط!'); const embed = new EmbedBuilder().setColor(0x0099ff).setTitle('فتح تذكرة').setDescription('اختر نوع التذكرة:\n\n1. تفتح تكت وتستهبل = تايم 10 دقايق\n2. تفتح تكت وما ترد = يتقفل\n3. أسلوبك سيء = تايم 10 دقايق\n4. يرجى فتح تذكرة بسبب واضح').setFooter({ text: 'التذاكر للتواصل مع الإدارة فقط' }).setImage('https://cdn.discordapp.com/attachments/1502376151073558589/1505260015487946934/t14tkkz.png?ex=6a09fa22&is=6a08a8a2&hm=b0383e2bb99cfda680d0b0de6f55bc7e31ca5a8d5812f4bc8fb2b744be13ed69'); const selectRow = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_type').setPlaceholder('اختر نوع التكت').addOptions(new StringSelectMenuOptionBuilder().setLabel('استفسار').setValue('inquiry').setDescription('سؤال عام'), new StringSelectMenuOptionBuilder().setLabel('Open Ticket').setValue('open_ticket').setDescription('تذكرة عامة'), new StringSelectMenuOptionBuilder().setLabel('شكوى على عضو').setValue('member_report').setDescription('شكوى'))); message.channel.send({ embeds: [embed], components: [selectRow] }); } });
+  registerCommand('تكت', ['تذكرة', 'tk'], { category: 'ادارة', description: 'رسالة التكت', execute(message) { if (!isModerator(message.member)) return message.reply('للإدارة فقط!'); const embed = new EmbedBuilder().setColor(0xFF0000).setTitle('فتح تذكرة').setDescription('اختر نوع التذكرة:\n\n1. تفتح تكت وتستهبل = تايم 10 دقايق\n2. تفتح تكت وما ترد = يتقفل\n3. أسلوبك سيء = تايم 10 دقايق\n4. يرجى فتح تذكرة بسبب واضح').setFooter({ text: 'التذاكر للتواصل مع الإدارة فقط' }).setImage('https://cdn.discordapp.com/attachments/1502376151073558589/1505260015487946934/t14tkkz.png?ex=6a09fa22&is=6a08a8a2&hm=b0383e2bb99cfda680d0b0de6f55bc7e31ca5a8d5812f4bc8fb2b744be13ed69'); const selectRow = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('ticket_type').setPlaceholder('اختر نوع التكت').addOptions(new StringSelectMenuOptionBuilder().setLabel('استفسار').setValue('inquiry').setDescription('سؤال عام'), new StringSelectMenuOptionBuilder().setLabel('Open Ticket').setValue('open_ticket').setDescription('تذكرة عامة'), new StringSelectMenuOptionBuilder().setLabel('شكوى على عضو').setValue('member_report').setDescription('شكوى'))); message.channel.send({ embeds: [embed], components: [selectRow] }); } });
   registerCommand('sqmr1', ['تحقق', 'ver'], { category: 'ادارة', description: 'رسالة تحقق', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const embed = new EmbedBuilder().setColor(0x5865F2).setTitle('تحقق').setDescription('اضغط على الزر عشان نتحقق'); const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('verify_human').setLabel('تحقق').setStyle(ButtonStyle.Primary)); message.channel.send({ embeds: [embed], components: [row] }); } });
   registerCommand('poll', ['تصويت', 'pl'], { category: 'عام', description: 'تصويت', execute(message, args) { const q = args.join(' '); if (!q) return message.reply('اكتب السؤال!'); message.channel.send({ embeds: [{ color: 0x5865F2, title: 'تصويت', description: q }] }).then(m => { m.react('👍'); m.react('👎'); }); } });
   registerCommand('giveaway', ['جيف', 'gv'], { category: 'ادارة', description: 'جيف أواي', execute(message, args) { if (!isModerator(message.member)) return message.reply('للإدارة فقط!'); const d = args[0]; const w = parseInt(args[1]); const prize = args.slice(2).join(' '); if (!d || !w || !prize) return message.reply('الاستخدام: !giveaway 1h 1 جوائز'); const ms = d.endsWith('m') ? parseInt(d) * 60000 : d.endsWith('h') ? parseInt(d) * 3600000 : d.endsWith('d') ? parseInt(d) * 86400000 : 3600000; bot.giveawayCounter++; const end = Date.now() + ms; message.channel.send({ embeds: [{ color: 0xFF00FF, title: 'جيف أواي', description: `الجائزة: **${prize}**\nالفائزين: ${w}\nالانتهاء: <t:${Math.floor(end / 1000)}:R>`, footer: { text: `ID: ${bot.giveawayCounter}` } }] }).then(msg => { msg.react('🎉'); bot.giveaways.set(bot.giveawayCounter, { msgId: msg.id, channelId: msg.channel.id, prize, winners: w, endTime: end, participants: [] }); setTimeout(async () => { const g = bot.giveaways.get(bot.giveawayCounter); const c = message.guild.channels.cache.get(g.channelId); const m = await c.messages.fetch(g.msgId); const u = (await m.reactions.cache.get('🎉').users.fetch()).filter(x => !x.bot); const winnersList = u.random(g.winners); c.send(winnersList.length ? `مبروك ${winnersList.join(', ')}! فزتوا بـ: **${prize}**` : 'ما في مشاركين كفاية!'); }, ms); }); } });
@@ -299,7 +299,19 @@ function setupEvents() {
   bot.on('guildMemberAdd', (member) => {
     if (bot.welcomeChannels.has(member.guild.id)) {
       const ch = member.guild.channels.cache.get(bot.welcomeChannels.get(member.guild.id));
-      if (ch) ch.send(`مرحبا ${member}!`);
+      if (ch) {
+        const welcomeEmbed = new EmbedBuilder()
+          .setColor(0xFF0000)
+          .setDescription(`منور/ه ${member}`)
+          .addFields(
+            { name: 'الاخبار', value: '<#1502422290896523334>' },
+            { name: 'تحقق', value: '<#1502440141992755283>' },
+            { name: 'قوانين', value: '<#1502440141992755283>' }
+          )
+          .setFooter({ text: `عضو رقم ${member.guild.memberCount}` })
+          .setTimestamp();
+        ch.send({ embeds: [welcomeEmbed] });
+      }
     }
   });
 
@@ -341,9 +353,21 @@ function setupEvents() {
       const data = { userId: interaction.user.id, channelId: channel.id, status: 'open', type: typeMap[type], createdAt: new Date(), closedAt: null, closedBy: null, closeReason: null, duration: null, claimedBy: null };
       bot.tickets.set(channel.id, data);
       const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام').setStyle(ButtonStyle.Success), new ButtonBuilder().setCustomId('rename_ticket').setLabel('تغيير الاسم').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId('close_ticket').setLabel('اغلاق').setStyle(ButtonStyle.Danger));
-      const embed = new EmbedBuilder().setColor(0x0099ff).setTitle(`تكت ${typeMap[type]}`).setDescription(`مرحبا ${interaction.user}\nالنوع: ${typeMap[type]}\nرقم: ${bot.ticketCounter}`).setFooter({ text: `تكت رقم ${bot.ticketCounter}` });
+      const embed = new EmbedBuilder().setColor(0xFF0000).setTitle(`تكت ${typeMap[type]}`).setDescription(`مرحبا ${interaction.user}\nالنوع: ${typeMap[type]}\nرقم: ${bot.ticketCounter}`).setFooter({ text: `تكت رقم ${bot.ticketCounter}` });
       await channel.send({ embeds: [embed], components: [row] });
       await interaction.reply({ content: `تم فتح تكت: ${channel}`, ephemeral: true });
+      // Send log to ticket log channel
+      const ticketLogSettings = bot.ticketSettings.get(interaction.guild.id);
+      if (ticketLogSettings && ticketLogSettings.logChannel) {
+        const logCh = interaction.guild.channels.cache.get(ticketLogSettings.logChannel);
+        if (logCh) {
+          const logEmbed = new EmbedBuilder().setColor(0x00FF00).setTitle('تكت جديد').setDescription(`**العضو:** ${interaction.user}
+**النوع:** ${typeMap[type]}
+**الرقم:** ${bot.ticketCounter}
+**الروم:** ${channel}`).setTimestamp();
+          logCh.send({ embeds: [logEmbed] }).catch(() => {});
+        }
+      }
     }
 
     if (interaction.customId === 'claim_ticket') {
@@ -388,6 +412,19 @@ function setupEvents() {
     if (interaction.customId === 'confirm_close') {
       const ticket = bot.tickets.get(interaction.channel.id);
       if (!ticket) return;
+      // Send log before deleting
+      const ticketLogSettings = bot.ticketSettings.get(interaction.guild.id);
+      if (ticketLogSettings && ticketLogSettings.logChannel) {
+        const logCh = interaction.guild.channels.cache.get(ticketLogSettings.logChannel);
+        if (logCh) {
+          const logEmbed = new EmbedBuilder().setColor(0xFF0000).setTitle('تكت مغلق').setDescription(`**العضو:** <@${ticket.userId}>
+**النوع:** ${ticket.type}
+**السبب:** ${ticket.closeReason || 'غير محدد'}
+**أغلقه:** <@${ticket.closedBy}>
+**المدة:** ${ticket.duration || 0} دقيقة`).setTimestamp();
+          logCh.send({ embeds: [logEmbed] }).catch(() => {});
+        }
+      }
       await interaction.channel.delete().catch(() => interaction.reply({ content: 'ما قدرت!', ephemeral: true }));
     }
 
