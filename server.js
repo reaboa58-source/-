@@ -234,7 +234,7 @@ function setupCommands() {
   registerCommand('report', ['ابلاغ', 'rep'], { category: 'عام', description: 'إبلاغ', execute(message, args) { const text = args.join(' '); if (!text) return message.reply('اكتب التقرير!'); message.reply({ embeds: [{ color: 0xFF0000, title: 'إبلاغ', description: text }] }); } });
   registerCommand('remind', ['تذكير', 'rm'], { category: 'عام', description: 'تذكير', execute(message, args) { const time = args[0]; const text = args.slice(1).join(' '); if (!time || !text) return message.reply('الاستخدام: !remind 10m اجتماع'); const ms = time.endsWith('m') ? parseInt(time) * 60000 : time.endsWith('h') ? parseInt(time) * 3600000 : 60000; message.reply(`تم تعيين تذكير بعد ${time}`); setTimeout(() => message.author.send(`تذكير: ${text}`).catch(() => {}), ms); } });
   registerCommand('help', ['مساعدة', 'h'], { category: 'عام', description: 'قائمة الأوامر', execute(message) { const a = [], m = [], p = [], l = [], s = []; bot.commands.forEach(cmd => { if (cmd.name === 'help') return; const al = cmd.aliases ? ` (${cmd.aliases.join(', ')})` : ''; const line = `\`!${cmd.name}\`${al} - ${cmd.description}`; if (cmd.category === 'ادارة') (['تكت', 'sqmr1', 'announce', 'resetxp', 'unwarn', 'giveaway'].includes(cmd.name) ? a : m).push(line); else if (cmd.category === 'لفل') l.push(line); else if (cmd.category === 'اعدادات') s.push(line); else p.push(line); }); message.reply({ embeds: [{ color: 0x5865F2, title: 'قائمة الأوامر', fields: [{ name: 'Admin', value: a.join('\n') || 'لا يوجد' }, { name: 'Mod', value: m.join('\n') || 'لا يوجد' }, { name: 'لفل', value: l.join('\n') || 'لا يوجد' }, { name: 'اعدادات', value: s.join('\n') || 'لا يوجد' }, { name: 'عامة', value: p.join('\n') || 'لا يوجد' }], footer: { text: `${bot.commands.size} امر` } }] }); } });
-  registerCommand('setwelcome', ['روم-ترحيب', 'sw'], { category: 'اعدادات', description: 'روم الترحيب', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const c = message.mentions.channels.first(); if (!c) return message.reply('منشن الروم!'); bot.welcomeChannels.set(message.guild.id, c.id); message.reply(`تم: ${c}`); } });
+  registerCommand('setwelcome', ['روم-ترحيب', 'sw'], { category: 'اعدادات', description: 'روم الترحيب', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const c = message.mentions.channels.first(); if (!c) return message.reply('منشن الروم!'); bot.welcomeChannels.set(message.guild.id, c.id); const previewEmbed = new EmbedBuilder().setColor(0xFF0000).setDescription(`منور/ه ${message.author}`).setThumbnail(message.author.displayAvatarURL({ size: 4096 })).addFields({ name: 'الاخبار', value: '<#1502422290896523334>' }, { name: 'تحقق', value: '<#1502440141992755283>' }, { name: 'قوانين', value: '<#1502440141992755283>' }).setFooter({ text: `عضو رقم ${message.guild.memberCount}` }).setTimestamp(); c.send({ embeds: [previewEmbed] }).then(() => message.reply(`تم تعيين روم الترحيب: ${c}`)).catch(() => message.reply('ما قدرت أرسل في الروم!')); } });
   registerCommand('setticket', ['روم-تكت', 'st'], { category: 'اعدادات', description: 'روم لوق التكت', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const c = message.mentions.channels.first(); if (!c) return message.reply('منشن روم اللوق!'); bot.ticketSettings.set(message.guild.id, { logChannel: c.id }); message.reply(`تم: ${c}`); } });
   registerCommand('setlevel', ['روم-لفل', 'sl'], { category: 'اعدادات', description: 'روم اللفل', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const c = message.mentions.channels.first(); if (!c) return message.reply('منشن الروم!'); bot.levelChannels.set(message.guild.id, c.id); message.reply(`تم: ${c}`); } });
   registerCommand('setlog', ['روم-لوق', 'log'], { category: 'اعدادات', description: 'روم اللوق', execute(message) { if (!isAdmin(message.member)) return message.reply('للأدمن فقط!'); const c = message.mentions.channels.first(); if (!c) return message.reply('منشن روم اللوق!'); bot.logChannels.set(message.guild.id, c.id); message.reply(`تم: ${c}`); } });
@@ -300,14 +300,17 @@ function setupEvents() {
     if (bot.welcomeChannels.has(member.guild.id)) {
       const ch = member.guild.channels.cache.get(bot.welcomeChannels.get(member.guild.id));
       if (ch) {
+        const avatarUrl = member.user.displayAvatarURL({ size: 4096 });
         const welcomeEmbed = new EmbedBuilder()
           .setColor(0xFF0000)
+          .setAuthor({ name: member.user.tag, iconURL: avatarUrl })
           .setDescription(`منور/ه ${member}`)
           .addFields(
             { name: 'الاخبار', value: '<#1502422290896523334>' },
             { name: 'تحقق', value: '<#1502440141992755283>' },
             { name: 'قوانين', value: '<#1502440141992755283>' }
           )
+          .setImage(avatarUrl)
           .setFooter({ text: `عضو رقم ${member.guild.memberCount}` })
           .setTimestamp();
         ch.send({ embeds: [welcomeEmbed] });
