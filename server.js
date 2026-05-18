@@ -63,8 +63,32 @@ function checkBadWords(message) {
   const content = message.content.toLowerCase();
   const member = message.member;
   
+  // Skip admin/moderator messages - don't delete or punish
+  if (member.permissions.has(PermissionFlagsBits.ManageMessages) || member.permissions.has(PermissionFlagsBits.KickMembers) || member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return;
+  }
+
+  // Check for long laughs (more than 3 repeated characters like هههه or فففف or خخخخ)
+  const laughPattern = /(ه|ف|خ|ح){4,}/;
+  if (laughPattern.test(content)) {
+    message.delete().catch(() => {});
+    addLog(`🗑️ ${message.author.tag} | ضحكة طويلة محذوفة`);
+    return;
+  }
+
   for (const [category, words] of Object.entries(badWords)) {
-    const found = words.some(word => content.includes(word.toLowerCase()));
+    // Use exact word matching - must match whole word not partial
+    const found = words.some(word => {
+      const lowerWord = word.toLowerCase();
+      // For multi-word phrases (contain spaces), use exact includes
+      if (lowerWord.includes(' ')) {
+        return content.includes(lowerWord);
+      }
+      // For single words, check if it's a standalone word
+      // Split content by non-word characters and check exact match
+      const contentWords = content.split(/[^a-zA-Z0-9ء-ي]+/);
+      return contentWords.includes(lowerWord);
+    });
     if (!found) continue;
     const punishment = rulePunishments[category];
     if (!punishment) continue;
@@ -341,9 +365,9 @@ function setupEvents() {
     if (interaction.customId === 'verify_human') {
       const member = interaction.member;
       const roleId = '1502800437235945692';
-      if (member.roles.cache.has(roleId)) return interaction.reply({ content: 'تم التحقق!', ephemeral: true });
-      await member.roles.add(roleId).catch(() => interaction.reply({ content: 'ما قدرت!', ephemeral: true }));
-      await interaction.reply({ content: 'تم التحقق!', ephemeral: true });
+      if (member.roles.cache.has(roleId)) return interaction.reply({ content: 'تم التحقق مسبقاً!', ephemeral: true });
+      await member.roles.add(roleId).catch(() => interaction.reply({ content: 'ما قدرت أعطيك الرتبة!', ephemeral: true }));
+      await interaction.reply({ content: `تم التحقق! تم إعطاؤك رتبة <@&${roleId}>`, ephemeral: true });
     }
 
     if (interaction.customId === 'ticket_type') {
